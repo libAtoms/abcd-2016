@@ -130,8 +130,8 @@ def run(opts, args, verbosity):
         print 'Unknown option --user. Terminating'
         sys.exit()
 
-    from ASEdb_SQLite3_interface import ASEdb_SQLite3_interface
-    api = ASEdb_SQLite3_interface(opts, args, verbosity)
+    from asedb_sqlite3_interface import asedb_sqlite3_interface
+    api = asedb_sqlite3_interface(opts, args, verbosity)
 
     # Incoming
     if opts.user and not opts.remote:

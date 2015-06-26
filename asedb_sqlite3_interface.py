@@ -5,13 +5,13 @@ from subprocess import call
 from random import randint
 from ConfigParser import SafeConfigParser
 
-config_path = os.path.join(os.path.abspath(os.path.dirname(os.path.realpath(__file__))), 'abcd_config.txt')
+config_path = os.path.join(os.environ['HOME'], '.abcd_config')
 dbs_path = None
 parser = SafeConfigParser()
 
 # Config file doesn't exist. Create it
 if not os.path.isfile(config_path):
-    ase_path = os.path.expanduser(raw_input('ASE path: '))
+    ase_path = os.path.expanduser(raw_input('ASE path (leave it blank if it is already in your PYTHONPATH): '))
     dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
 
     cfg_file = open(config_path,'w')
@@ -33,7 +33,7 @@ from ase.db.summary import Summary
 from ase.io import read as ase_io_read, write as ase_io_write
 from ase.db.core import convert_str_to_float_or_str
 
-class ASEdb_SQLite3_interface:
+class asedb_sqlite3_interface:
     '''Interface the ase-db SQLite3 backend'''
 
     def __init__(self, opts, args, verbosity):
@@ -65,9 +65,14 @@ class ASEdb_SQLite3_interface:
             self.delete_keys = []
 
         if not os.path.isdir(self.dbs_path):
-            print self.dbs_path, 'does not exist. Create this directory first.'
-            sys.exit()
+            os.mkdir(dbs_path)
+            print self.dbs_path, 'was created'
 
+        if not os.path.isdir(os.path.join(self.dbs_path, 'all')):
+            os.mkdir(os.path.join(dbs_path, 'all'))
+            print os.path.join(self.dbs_path,'all'), 'was created'
+
+            
         if self.user == None:
             home = 'all'
         else:
