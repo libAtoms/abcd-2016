@@ -2,7 +2,7 @@
 
 import os
 import sys
-import optparse
+import argparse
 from subprocess import call
 
 description = """Selecton is a comma-separated list of
@@ -13,22 +13,28 @@ Special keys: id, user, calculator, age, natoms, energy, magmom,
 and charge.  Chemical symbols can also be used to select number of
 specific atomic species (H, He, Li, ...)."""
 
-examples = ['calculator=nwchem',
-            'age<1d',
-            'natoms=1',
-            'user=alice',
-            '2.2<bandgap<4.1',
-            'Cu>=10']
+examples = ['''
+./abcd.py --remote remote@remote.com --list   - list all databases that you have access to
+        at remote@remote.com
+./abcd.py --remote remote@remote.com water.db   - display the contents of the database water.db
+./abcd.py --list   - list all local databases
+./abcd.py -a test.xyz test.db -Ao --unique   - add the test.xyz file to the test.db database. 
+        If the database does not exist yet, it is created under databases/all''']
 
 def main(args = sys.argv[1:]):
     if isinstance(args, str):
         args = args.split(' ')
-    parser = optparse.OptionParser(
-        usage = 'Usage: %prog db-name [selection] [options]',
-        description = description,
-        epilog = 'Selection examples: ' + ', '.join(examples) + '.')
+    parser = argparse.ArgumentParser(usage = 'Usage: %%prog [db-name] [selection] [options]',
+                        description = description,
+                        epilog = 'Selection examples: ' + ', '.join(examples) + '.',
+                        formatter_class=argparse.RawTextHelpFormatter)
+
+    # Display usage if no arguments are supplied
+    if len(sys.argv)==1:
+        parser.print_usage()
+        sys.exit(1)
     
-    add = parser.add_option
+    add = parser.add_argument
     add('-v', '--verbose', action='store_true', default=False)
     add('-q', '--quiet', action='store_true', default=False)
     add('-n', '--count', action='store_true',
@@ -37,19 +43,19 @@ def main(args = sys.argv[1:]):
         help='Long description of selected row')
     add('-i', '--insert-into', metavar='db-name',
         help='Insert selected rows into another database.')
-    add('-a', '--add-from-file', metavar='[type:]filename...',
+    add('-a', '--add-from-file', metavar='(type:)filename...',
         help='Add results from file.')
     add('-o', '--store-original-file', action='store_true',
-        help='When adding files with --add-from-file, include original filename and full contents')    
+                    help='When adding files with --add-from-file, include original filename \nand full contents')
     add('-x', '--extract-original-file', action='store_true',
         help='Extract an original file stored with -o/--store-original-file')
-    add('-W', '--write-to-file', metavar='[type:]filename',
-        help='Write selected rows to file(s). Include format string for multiple files, e.g. file_%03d.xyz')
+    add('-W', '--write-to-file', metavar='(type:)filename',
+        help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('-A', '--all-data', action='store_true', default=False,
         help="Include atoms.info and atoms.arrays dictionaries in key_value_pairs and data")
     add('-k', '--add-key-value-pairs', metavar='key1=val1,key2=val2,...',
         help='Add key-value pairs to selected rows.  Values must be numbers '
-        'or strings and keys must follow the same rules as keywords.')
+        'or strings and keys \nmust follow the same rules as keywords.')
     add('-L', '--limit', type=int, default=500, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
@@ -64,14 +70,14 @@ def main(args = sys.argv[1:]):
     add('--explain', action='store_true',
         help='Explain query plan.')
     add('-c', '--columns', metavar='col1,col2,...',
-        help='Specify columns to show.  Precede the column specification '
-        'with a "+" in order to add columns to the default set of columns.  '
+        help='Specify columns to show.  Precede the column specification \n'
+        'with a "+" in order to add columns to the default set of columns. \n '
         'Precede by a "-" to remove columns.  Use "++" for all.')
     add('-s', '--sort', metavar='column', default='id',
         help='Sort rows using column.  Use -column for a descendin sort.  '
         'Default is to sort after id.')
     add('--cut', type=int, default=35, help='Cut keywords and key-value '
-        'columns after CUT characters.  Use --cut=0 to disable cutting. '
+        'columns after CUT characters.  Use --cut=0 \nto disable cutting. '
         'Default is 35 characters')
     #add('-p', '--plot', metavar='[a,b:]x,y1,y2,...',
         #help='Example: "-p x,y": plot y row against x row. Use '
@@ -90,13 +96,15 @@ def main(args = sys.argv[1:]):
         help='Give rows a new unique id when using --insert-into.')
     add('--list', action = 'store_true', help = 'Lists all the databases you have access to')
     add('--remote', help = 'Specify the remote')
-    add('-u', '--user', help = optparse.SUPPRESS_HELP)
-    opts, args = parser.parse_args(args)
+    add('-u', '--user', help = argparse.SUPPRESS)
+    add('database', nargs = '?', help = 'Specify the database')
+    add('query', nargs = '?', default = '', help = 'Query')
+    args = parser.parse_args()
 
-    verbosity = 1 - opts.quiet + opts.verbose
+    verbosity = 1 - args.quiet + args.verbose
 
     try:
-        run(opts, args, verbosity)
+        run(args, verbosity)
     except Exception as x:
         if verbosity < 2:
             print('{0}: {1}'.format(x.__class__.__name__, x))
@@ -104,13 +112,13 @@ def main(args = sys.argv[1:]):
         else:
             raise
 
-def run(opts, args, verbosity):
+def run(args, verbosity):
 
     # Query to the remote server. Remove the --remote argumnt and send the commmand
     # via ssh
-    if not opts.user and opts.remote:
+    if not args.user and args.remote:
 
-        ssh_call = 'ssh {} '.format(opts.remote)
+        ssh_call = 'ssh {} '.format(args.remote)
 
         # Remove the 'remote' argument
         for arg in ['--remote', '-remote', '--r', '-r']:
@@ -126,69 +134,69 @@ def run(opts, args, verbosity):
         return
 
     # User specified the user argument, quit
-    if opts.user and opts.remote:
+    if args.user and args.remote:
         print 'Unknown option --user. Terminating'
         sys.exit()
 
     from asedb_sqlite3_interface import asedb_sqlite3_interface
-    api = asedb_sqlite3_interface(opts, args, verbosity)
+    interface = asedb_sqlite3_interface(args, verbosity)
 
     # Incoming
-    if opts.user and not opts.remote:
+    if args.user and not args.remote:
 
         # Can be used without any database specified
-        if opts.list:
-            api.list()
+        if args.list:
+            interface.list()
 
         # Database has to be specified as an argument
-        if api.database:
-            if opts.analyse:
-                api.analyse()
-            elif opts.count:
-                api.count()
-            elif opts.explain:
-                api.explain()
+        if interface.database:
+            if args.analyse:
+                interface.analyse()
+            elif args.count:
+                interface.count()
+            elif args.explain:
+                interface.explain()
             else:
-                if opts.long:
-                    api.long()
-                elif opts.json:
-                    api.json()
+                if args.long:
+                    interface.long()
+                elif args.json:
+                    interface.json()
                 else:
-                    api.default()
+                    interface.default()
 
     # Local
-    elif not opts.user and not opts.remote:
+    elif not args.user and not args.remote:
 
         # Can be used without any database specified
-        if opts.list:
-            api.list()
+        if args.list:
+            interface.list()
         
         # Database has to be specified as an argument
-        if api.database:
-            if opts.analyse:
-                api.analyse()
-            elif opts.count:
-                api.count()
-            elif opts.explain:
-                api.explain()
-            elif opts.add_from_file:
-                api.add_from_file()
-            elif opts.add_key_value_pairs or opts.delete_keys:
-                api.modify_keys()
-            elif opts.delete:
-                api.delete()
-            elif opts.insert_into:
-                api.insert_into()
-            elif opts.write_to_file:
-                api.write_to_file()
-            elif opts.extract_original_file:
-                api.extract_original_file()
+        if interface.database:
+            if args.analyse:
+                interface.analyse()
+            elif args.count:
+                interface.count()
+            elif args.explain:
+                interface.explain()
+            elif args.add_from_file:
+                interface.add_from_file()
+            elif args.add_key_value_pairs or args.delete_keys:
+                interface.modify_keys()
+            elif args.delete:
+                interface.delete()
+            elif args.insert_into:
+                interface.insert_into()
+            elif args.write_to_file:
+                interface.write_to_file()
+            elif args.extract_original_file:
+                interface.extract_original_file()
             else:
-                if opts.long:
-                    api.long()
-                elif opts.json:
-                    api.json()
+                if args.long:
+                    interface.long()
+                elif args.json:
+                    interface.json()
                 else:
-                    api.default()
+                    interface.default()
 
 main()

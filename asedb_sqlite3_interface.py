@@ -11,12 +11,10 @@ parser = SafeConfigParser()
 
 # Config file doesn't exist. Create it
 if not os.path.isfile(config_path):
-    ase_path = os.path.expanduser(raw_input('ASE path (leave it blank if it is already in your PYTHONPATH): '))
     dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
 
     cfg_file = open(config_path,'w')
     parser.add_section('ase-db')
-    parser.set('ase-db', 'ase_path', ase_path)
     parser.set('ase-db', 'dbs_path', dbs_path)
     parser.write(cfg_file)
     cfg_file.close()
@@ -24,7 +22,6 @@ if not os.path.isfile(config_path):
 else:
     parser.read(config_path)
     dbs_path = parser.get('ase-db', 'dbs_path')
-    sys.path.append(parser.get('ase-db', 'ase_path'))
 
 from ase.db import connect
 from ase.db.table import Table, all_columns
@@ -36,31 +33,25 @@ from ase.db.core import convert_str_to_float_or_str
 class asedb_sqlite3_interface:
     '''Interface the ase-db SQLite3 backend'''
 
-    def __init__(self, opts, args, verbosity):
-        self.user = opts.user
-        self.opts = opts
+    def __init__(self, args, verbosity):
         self.args = args
+        self.user = args.user
         self.verbosity = verbosity
         self.dbs_path = dbs_path
-
-        if args:
-            # Sanitise it by removing all the slashes and dots
-            self.database = os.path.basename(args.pop(0))
-        else:
-            self.database = None
-        self.query = ','.join(args)
+        self.query = args.query
+        self.database = args.database
 
         if self.query.isdigit():
             self.query = int(self.query)
 
         self.add_key_value_pairs = {}
-        if self.opts.add_key_value_pairs:
-            for pair in self.opts.add_key_value_pairs.split(','):
+        if self.args.add_key_value_pairs:
+            for pair in self.args.add_key_value_pairs.split(','):
                 key, value = pair.split('=')
                 self.add_key_value_pairs[key] = convert_str_to_float_or_str(value)
 
-        if self.opts.delete_keys:
-            self.delete_keys = self.opts.delete_keys.split(',')
+        if self.args.delete_keys:
+            self.delete_keys = self.args.delete_keys.split(',')
         else:
             self.delete_keys = []
 
@@ -107,11 +98,11 @@ class asedb_sqlite3_interface:
         con = self.open_connection(file_path)
 
         columns = list(all_columns)
-        c = self.opts.columns
+        c = self.args.columns
         if c and c.startswith('++'):
             keys = set()
             for row in con.select(self.query,
-                                  limit=self.opts.limit, offset=self.opts.offset):
+                                  limit=self.args.limit, offset=self.args.offset):
                 keys.update(row._keys)
             columns.extend(keys)
             if c[2:3] == ',':
@@ -129,9 +120,9 @@ class asedb_sqlite3_interface:
                 else:
                     columns.append(col.lstrip('+'))
         
-        table = Table(con, self.verbosity, self.opts.cut)
-        table.select(self.query, columns, self.opts.sort, self.opts.limit, self.opts.offset)
-        if self.opts.csv:
+        table = Table(con, self.verbosity, self.args.cut)
+        table.select(self.query, columns, self.args.sort, self.args.limit, self.args.offset)
+        if self.args.csv:
             table.write_csv()
         else:
             table.write()
@@ -143,7 +134,7 @@ class asedb_sqlite3_interface:
             PostgreSQLDatabase).'''
 
         file_path = os.path.join(self.root_dir, db_name)
-        return connect(file_path, use_lock_file = not self.opts.no_lock_file)
+        return connect(file_path, use_lock_file = not self.args.no_lock_file)
 
     def out(self, *args):
             if self.verbosity > 0:
@@ -158,7 +149,7 @@ class asedb_sqlite3_interface:
         '''Adds a file to the database. The database is created under $dbs_path/all.'''
 
         con = self.open_connection(self.database)
-        filename = self.opts.add_from_file
+        filename = self.args.add_from_file
         if ':' in filename:
             calculator_name, filename = filename.split(':')
             atoms = get_calculator(calculator_name)(filename).get_atoms()
@@ -167,13 +158,13 @@ class asedb_sqlite3_interface:
             if isinstance(atoms, list):
                 raise RuntimeError('multi-config file formats not yet supported')
         data = {}            
-        if self.opts.store_original_file:
+        if self.args.store_original_file:
             self.add_key_value_pairs['original_file_name'] = filename
             with open(filename) as f:
                 original_file_contents = f.read()
             data['original_file_contents'] = original_file_contents
         con.write(atoms, key_value_pairs=self.add_key_value_pairs, data=data,
-                  add_from_info_and_arrays=self.opts.all_data)
+                  add_from_info_and_arrays=self.args.all_data)
         self.out('Added {0} from {1}'.format(atoms.get_chemical_formula(),
                                         filename))
 
@@ -188,7 +179,7 @@ class asedb_sqlite3_interface:
         con = self.open_connection(self.database)
         for dct in con.select(self.query, explain=True,
                               verbosity=self.verbosity,
-                              limit=self.opts.limit, offset=self.opts.offset):
+                              limit=self.args.limit, offset=self.args.offset):
             print dct['explain']
 
     def insert_into(self):
@@ -196,14 +187,14 @@ class asedb_sqlite3_interface:
         nkvp = 0
         nrows = 0
         con = self.open_connection(self.database)
-        with self.open_connection(self.opts.insert_into,
-                     use_lock_file=not self.opts.no_lock_file) as con2:
+        with self.open_connection(self.args.insert_into,
+                     use_lock_file=not self.args.no_lock_file) as con2:
             for dct in con.select(self.query):
                 kvp = dct.get('key_value_pairs', {})
                 nkvp -= len(kvp)
                 kvp.update(self.add_key_value_pairs)
                 nkvp += len(kvp)
-                if self.opts.unique:
+                if self.args.unique:
                     dct['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
                 con2.write(dct, data=dct.get('data'), **kvp)
                 nrows += 1
@@ -216,7 +207,7 @@ class asedb_sqlite3_interface:
     # TODO: Enable this when remotely querying the database
     def write_to_file(self):
         '''Write the selected atoms to a file'''
-        filename = self.opts.write_to_file
+        filename = self.args.write_to_file
         if ':' in filename:
             format, filename = filename.split(':')
         else:
@@ -225,7 +216,7 @@ class asedb_sqlite3_interface:
         list_of_atoms = []
         con = self.open_connection(self.database)
         for row in con.select(self.query):
-            atoms = row.toatoms(add_to_info_and_arrays=self.opts.all_data)
+            atoms = row.toatoms(add_to_info_and_arrays=self.args.all_data)
             if 'original_file_contents' in atoms.info:
                 del atoms.info['original_file_contents']
             list_of_atoms.append(atoms)
@@ -279,7 +270,7 @@ class asedb_sqlite3_interface:
         '''Deletes the selected row'''
         con = self.open_connection(self.database)
         ids = [dct['id'] for dct in con.select(self.query)]
-        if ids and not self.opts.yes:
+        if ids and not self.args.yes:
             msg = 'Delete %s? (yes/No): ' % plural(len(ids), 'row')
             if raw_input(msg).lower() != 'yes':
                 return
@@ -288,17 +279,17 @@ class asedb_sqlite3_interface:
 
     '''# UserWarning: No labelled objects found.
     def plot(self):
-        if ':' in opts.plot:
-            tags, keys = opts.plot.split(':')
+        if ':' in args.plot:
+            tags, keys = args.plot.split(':')
             tags = tags.split(',')
         else:
             tags = []
-            keys = opts.plot
+            keys = args.plot
         keys = keys.split(',')
         plots = collections.defaultdict(list)
         X = {}
         labels = []
-        for row in con.select(query, sort=opts.sort):
+        for row in con.select(query, sort=args.sort):
             name = ','.join(row[tag] for tag in tags)
             x = row.get(keys[0])
             if x is not None:
