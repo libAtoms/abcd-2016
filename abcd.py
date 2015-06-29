@@ -3,7 +3,7 @@
 import os
 import sys
 import argparse
-from subprocess import call
+import subprocess
 
 description = """Selecton is a comma-separated list of
 selections where each selection is of the type "ID", "key" or
@@ -114,9 +114,22 @@ def main(args = sys.argv[1:]):
 
 def run(args, verbosity):
 
-    # Query to the remote server. Remove the --remote argumnt and send the commmand
-    # via ssh
-    if not args.user and args.remote:
+    # Try to import the interface. If it fails, the script only has limited
+    # functionality (only remote querying without saving).
+    try:
+        from asedb_sqlite3_interface import asedb_sqlite3_interface
+        interface_enabled = True
+    except ImportError:
+        interface_enabled = False
+    
+    # User specified the "user" argument, quit.
+    if args.user and args.remote:
+        print 'Unknown option --user. Terminating'
+        sys.exit()
+
+    # Query to the remote server. Remove the --remote argumnet and 
+    # send the commmand via ssh. Mode: remote
+    elif not args.user and args.remote:
 
         ssh_call = 'ssh {} '.format(args.remote)
 
@@ -130,42 +143,27 @@ def run(args, verbosity):
         arguments = '\' {}\''.format(arguments)
         command = ssh_call + arguments
         
-        call(command, shell=True)
-        return
+        # Execute the ssh command, capture the output
+        try:
+            output = subprocess.check_output(command, shell=True)
+        except subprocess.CalledProcessError as e:
+            print e.output
+            sys.exit()
 
-    # User specified the user argument, quit
-    if args.user and args.remote:
-        print 'Unknown option --user. Terminating'
-        sys.exit()
-
-    from asedb_sqlite3_interface import asedb_sqlite3_interface
-    interface = asedb_sqlite3_interface(args, verbosity)
-
-    # Incoming
-    if args.user and not args.remote:
-
-        # Can be used without any database specified
-        if args.list:
-            interface.list()
-
-        # Database has to be specified as an argument
-        if interface.database:
-            if args.analyse:
-                interface.analyse()
-            elif args.count:
-                interface.count()
-            elif args.explain:
-                interface.explain()
+        if interface_enabled:
+            interface = asedb_sqlite3_interface(args, verbosity, mode = 'remote')
+            if args.write_to_file:
+                interface.write_to_file(contents = output)
             else:
-                if args.long:
-                    interface.long()
-                elif args.json:
-                    interface.json()
-                else:
-                    interface.default()
+                print output
+        else:
+            print output
 
-    # Local
-    elif not args.user and not args.remote:
+    else:
+        if not args.user and not args.remote:
+            interface = asedb_sqlite3_interface(args, verbosity, mode = 'local')
+        else:
+            interface = asedb_sqlite3_interface(args, verbosity, mode = 'incoming')
 
         # Can be used without any database specified
         if args.list:
