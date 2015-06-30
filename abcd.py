@@ -5,7 +5,7 @@ import sys
 import argparse
 import subprocess
 
-description = """Selecton is a comma-separated list of
+description = """Selection is a comma-separated list of
 selections where each selection is of the type "ID", "key" or
 "key=value".  Instead of "=", one can also use "<", "<=", ">=", ">"
 and  "!=" (these must be protected from the shell by using quotes).
@@ -24,7 +24,7 @@ examples = ['''
 def main(args = sys.argv[1:]):
     if isinstance(args, str):
         args = args.split(' ')
-    parser = argparse.ArgumentParser(usage = 'Usage: %%prog [db-name] [selection] [options]',
+    parser = argparse.ArgumentParser(usage = 'Usage: %(prog)s [db-name] [selection] [options]',
                         description = description,
                         epilog = 'Selection examples: ' + ', '.join(examples) + '.',
                         formatter_class=argparse.RawTextHelpFormatter)
