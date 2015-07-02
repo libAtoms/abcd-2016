@@ -18,7 +18,5 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 2.7",
         "Development Status:: 2 - Pre - Alpha"],
-    scripts=[os.path.join("scripts", f) for f in os.listdir("scripts")
-             if not os.path.isdir(os.path.join("scripts", f))]
 )
 
