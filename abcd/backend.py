@@ -38,7 +38,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def find(self, auth_token, filter):
+    def find(self, auth_token, filter, sort, limit):
         pass
 
     @abstractmethod

@@ -8,10 +8,22 @@ from itertools import imap
 
 from ase.db import connect
 from ase.utils import plural
-from ase.db.row import atoms2dict
 from ase.atoms import Atoms
 
 class ASEdbSQlite3Backend(Backend):
+
+    class Cursor(abcd.backend.Cursor):
+        def __init__(self, iterator):
+            self.iterator = iterator
+
+        def next(self):
+            return self.iterator.next()
+
+        def count(self):
+            n = 0
+            for a in self.iterator:
+                n += 1
+            return n
 
     def __init__(self, database=None, user=None, password=None):
 
@@ -90,11 +102,14 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Deleted {}'.format(plural(len(ids), 'row'))
         return results.RemoveResult(removed_count=len(ids), msg=msg)
 
-    def find(self, auth_token, filter):
-        rows_iter = self.connection.select(filter)
+    def find(self, auth_token, filter, sort, limit):
+        if not sort:
+            sort = 'id'
+        rows_iter = self.connection.select(filter, sort=sort, limit=limit)
 
         # Convert it to the Atoms iterator.
-        return imap(lambda x: x.toatoms(add_to_info_and_arrays=True), rows_iter)
+        return ASEdbSQlite3Backend.Cursor(
+                    imap(lambda x: x.toatoms(add_to_info_and_arrays=True), rows_iter))
 
     def open(self):
         pass
