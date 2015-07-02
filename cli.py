@@ -6,6 +6,7 @@ import argparse
 import subprocess
 
 from abcd.authentication import Credentials
+from abcd.structurebox import StructureBox
 
 from ase.utils import plural
 from ase.io import read
@@ -41,10 +42,12 @@ def main(args = sys.argv[1:]):
     add('-q', '--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
     add('-u', '--user', help = argparse.SUPPRESS)
-    add('database', help = 'Specify the database')
+    add('database', nargs='?', help = 'Specify the database')
     add('query', nargs = '?', default = '', help = 'Query')
     add('--remove', action='store_true',
         help='Remove selected rows.')
+    add('--list', action = 'store_true', 
+        help = 'Lists all the databases you have access to')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -84,6 +87,7 @@ def run(args, verbosity):
         # Execute the ssh command, capture the output
         try:
             output = subprocess.check_output(command, shell=True)
+            print output
         except subprocess.CalledProcessError as e:
             print e.output
             sys.exit()
@@ -96,8 +100,16 @@ def run(args, verbosity):
 
         if not backend_enabled:
             raise Exception('The backend could not be imported')
-        backend = ASEdbSQlite3Backend(database=args.database, user=args.user)
-        token = backend.authenticate(Credentials(args.user))
+        box = StructureBox(ASEdbSQlite3Backend(database=args.database, user=args.user))
+        token = box.authenticate(Credentials(args.user))
+
+        if args.list:
+            print box.list_databases()
+            return
+
+        # Beyond this point a database has to be specified
+        if not args.database:
+            raise Exception('No database specified')
 
         # Get the query
         query = args.query
@@ -105,12 +117,12 @@ def run(args, verbosity):
             query = int(query)
 
         if args.remove:
-            backend.remove(token, query, False)
+            box.remove(token, query, False)
 
         else:
             # If there was a query, print number of configurations found
             # If there was no query, print the whole database
-            atoms_it = backend.find(token, query)
+            atoms_it = box.find(token, query)
             for at in atoms_it:
                 print at
 
