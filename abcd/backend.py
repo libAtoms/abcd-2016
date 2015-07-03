@@ -31,14 +31,48 @@ class Backend(object):
 
     @abstractmethod
     def insert(self, auth_token, atoms):
+        """
+        Take the Atoms object or an iterable to the Atoms and insert it
+        to the database
+
+        :param AuthToken auth_token: Authorisation token
+        :param atoms: Atoms to insert
+        :type atoms: Atoms or Atoms iterable
+        :return: Returns a result that holds a list of ids at which 
+            the objects were inserted and a message
+        :rtype: InsertResult
+        """
         pass
 
     @abstractmethod
     def remove(self, auth_token, filter, just_one):
+        """
+        Remove entries from the databse that match the filter
+
+        :param AuthToken auth_token: Authorisation token
+        :param filter: Filter (in MongoDB query language)
+        :type filter: dictionary?
+        :param bool just_one: remove not more than one entry
+        :return: Returns a result that holds the number of removed
+            entries and a message
+        :rtype: RemoveResult
+        """
         pass
 
     @abstractmethod
     def find(self, auth_token, filter, sort, limit):
+        """
+        Find entries that match the filter
+
+        :param AuthToken auth_token: Authorisation token
+        :param filter: Filter (in MongoDB query language)
+        :type filter: dictionary?
+        :param sort: Sort by
+        :type sort: string?
+        :param int limit: limit the number of returned entries
+        :return:
+        :rtype: Iterator to the Aoms object
+        """
         pass
 
     @abstractmethod

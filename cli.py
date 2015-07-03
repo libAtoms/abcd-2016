@@ -7,10 +7,12 @@ import subprocess
 
 from abcd.authentication import Credentials
 from abcd.structurebox import StructureBox
+from abcd.util import atoms2dict
 
 from ase.utils import plural
-from ase.io import read
-from ase.db.row import atoms2dict
+from ase.io import read as ase_read
+from ase.io import write as ase_write
+from ase.db.summary import Summary
 
 # Try to import the interface. If it fails, the script only has limited
 # functionality (only remote querying without saving).
@@ -38,16 +40,29 @@ def main(args = sys.argv[1:]):
         sys.exit(1)
 
     add = parser.add_argument
-    add('-v', '--verbose', action='store_true', default=False)
-    add('-q', '--quiet', action='store_true', default=False)
+    add('--verbose', action='store_true', default=False)
+    add('--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
-    add('-u', '--user', help = argparse.SUPPRESS)
+    add('--user', help = argparse.SUPPRESS)
     add('database', nargs='?', help = 'Specify the database')
     add('query', nargs = '?', default = '', help = 'Query')
     add('--remove', action='store_true',
         help='Remove selected rows.')
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
+    add('--limit', type=int, default=500, metavar='N',
+        help='Show only first N rows (default is 500 rows).  Use --limit=0 '
+        'to show all.')
+    add('--sort', metavar='COL', default=None,
+        help='Specify the column to sort the rows by')
+    add('--write-to-file', metavar='(type:)filename',
+        help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
+    add('--extract-original-file', action='store_true',
+        help='Extract an original file stored with -o/--store-original-file')
+    add('--add-from-file', metavar='(type:)filename...',
+        help='Add results from file.')
+    add('--keys', action='store_true', default=False, 
+        help='Show available keys')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -63,6 +78,11 @@ def main(args = sys.argv[1:]):
             raise
 
 def run(args, verbosity):
+
+    def out(*args):
+        if verbosity > 0:
+            print ' '.join(args)
+
     # User specified the "user" argument, quit.
     if args.user and args.remote:
         print 'Unknown option --user. Terminating'
@@ -97,6 +117,8 @@ def run(args, verbosity):
             mode = 'local'
         else:
             mode = 'incoming'
+            print 'This is not yet supported'
+            sys.exit()
 
         if not backend_enabled:
             raise Exception('The backend could not be imported')
@@ -119,11 +141,99 @@ def run(args, verbosity):
         if args.remove:
             box.remove(token, query, False)
 
+        elif args.write_to_file:
+            filename = args.write_to_file
+            if '.' in filename:
+                format = filename.split('.')[1]
+            else:
+                format = None
+
+            nrows = 0
+            list_of_atoms = []
+            for atoms in box.find(auth_token=token, filter=query, 
+                            sort=args.sort, limit=args.limit):
+                if 'original_file_contents' in atoms.info:
+                    del atoms.info['original_file_contents']
+                list_of_atoms.append(atoms)
+                nrows += 1
+
+            if '%' in filename:
+                for i, atoms in enumerate(list_of_atoms):
+                    ase_write(filename % i, atoms, format=format)
+            else:
+                if filename == '-':
+                    if format is None: format = 'extxyz'
+                    filename = sys.stdout
+                ase_write(filename, list_of_atoms, format=format)
+
+            out('Wrote %d rows.' % len(list_of_atoms))
+
+        elif args.extract_original_file:
+            nwrite = 0
+            nat = 0
+            for atoms in box.find(auth_token=token, filter=query, 
+                            sort=args.sort, limit=args.limit):
+                nat += 1
+                if ('original_file_name' not in atoms.info or
+                    'original_file_contents' not in atoms.info):
+                    out('no original file stored for configuration %d' % nat)
+                    continue
+                original_file_name = atoms.info['original_file_name']
+
+                # Restore to current working directory
+                original_file_name = os.path.basename(original_file_name)
+                if os.path.exists(original_file_name):
+                    out('original_file_name %s already exists in current ' %
+                         original_file_name + 'working directory, skipping write')
+                    continue
+
+                out('Writing %s' % original_file_name)            
+                with open(original_file_name, 'w') as original_file:
+                    original_file.write(atoms.info['original_file_contents'])
+                nwrite += 1
+
+            out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
+
+        elif args.add_from_file:
+            if query:
+                print 'Ignoring query:', query
+
+            filename = args.add_from_file
+            if ':' in filename:
+                calculator_name, filename = filename.split(':')
+                atoms = get_calculator(calculator_name)(filename).get_atoms()
+            else:
+                atoms = ase_read(filename)
+                if isinstance(atoms, list):
+                    raise RuntimeError('multi-config file formats not yet supported')
+
+            with open(filename) as f:
+                original_file_contents = f.read()
+            atoms.info['original_file_name'] = filename
+            atoms.arrays['original_file_contents'] = original_file_contents
+
+            box.insert(token, atoms)
+            out('Added {0} from {1}'.format(atoms.get_chemical_formula(), filename))
+
+        # Takes the first row of the database and prints its keys
+        elif args.keys:
+            atoms_it = box.find(auth_token=token, filter='', limit=1)
+            try:
+                atoms = atoms_it.next()
+                print ('The following keys are present (there might be more but'
+                    ' they were stripped by the atoms2dict function):')
+                print atoms2dict(atoms, True).keys()
+            except StopIteration:
+                print 'The database is empty'
+           
         else:
             # If there was a query, print number of configurations found
             # If there was no query, print the whole database
-            atoms_it = box.find(token, query)
-            for at in atoms_it:
-                print at
+            atoms_it = box.find(auth_token=token, filter=query, 
+                                sort=args.sort, limit=args.limit)
+            count = 0
+            for ats in atoms_it:
+                count += 1
+            print plural(count, 'row'), 'match'
 
 main()

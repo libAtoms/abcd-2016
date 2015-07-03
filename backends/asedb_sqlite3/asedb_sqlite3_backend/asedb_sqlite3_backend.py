@@ -95,9 +95,12 @@ class ASEdbSQlite3Backend(Backend):
         return results.InsertResult(inserted_ids=ids, msg=msg)
 
     def remove(self, auth_token, filter, just_one):
-        ids = [dct['id'] for dct in self.connection.select(filter)]
-        if just_one and ids:
-            ids = ids[0:1]
+        # TODO: don't select everything when there is a limit specified
+        if just_one:
+            limit = 1
+        else:
+            limit = 0
+        ids = [dct['id'] for dct in self.connection.select(filter, limit=limit)]
         self.connection.delete(ids)
         msg = 'Deleted {}'.format(plural(len(ids), 'row'))
         return results.RemoveResult(removed_count=len(ids), msg=msg)
