@@ -55,6 +55,12 @@ def atoms2dict(atoms, include_all_data=False):
 
     return dct
 
+def trim(str, length):
+    if len(str) > length:
+        return (str[:length] + '..')
+    else:
+        return str
+
 def atoms_it2table(atoms_it):
     table = []
     for atoms in atoms_it:
@@ -79,21 +85,22 @@ def atoms_it2table(atoms_it):
     keys_list = list(keys)
 
     # Reorder the list
-    order = ['id', 'user', 'ctime', 'formula']
+    order = ['id', 'ctime', 'user', 'formula', 'config_type', 'calculator', 
+                'calculator_parameters', 'positions', 'energy', 'stress', 
+                'forces', 'pbc', 'numbers']
     for key in reversed(order):
         if key in keys_list:
             keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
     from prettytable import PrettyTable
-    t = PrettyTable(keys_list)
+    t = PrettyTable([trim(key, 10) for key in keys_list])
     t.padding_width = 0
     for dct in table:
         lst = []
         for key in keys_list:
             if key in dct:
                 value = dct[key]
-                value = str(value)
-                value = (value[:10] + '..') if len(value) > 10 else value
+                value = trim(str(value), 10)
             else:
                 value = '-'
             lst.append(value)

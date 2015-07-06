@@ -114,11 +114,9 @@ def run(args, verbosity):
 
     else:
         if not args.user and not args.remote:
-            mode = 'local'
+            ssh = False
         else:
-            mode = 'incoming'
-            print 'This is not yet supported'
-            sys.exit()
+            ssh = True
 
         if not backend_enabled:
             raise Exception('The backend could not be imported')
@@ -139,9 +137,15 @@ def run(args, verbosity):
             query = int(query)
 
         if args.remove:
+            if ssh:
+                print 'Remote removing not yet supported'
+                return
             box.remove(token, query, False)
 
         elif args.write_to_file:
+            if ssh:
+                print 'Remote writing not yet supported'
+                return
             filename = args.write_to_file
             if '.' in filename:
                 format = filename.split('.')[1]
@@ -169,6 +173,9 @@ def run(args, verbosity):
             out('Wrote %d rows.' % len(list_of_atoms))
 
         elif args.extract_original_file:
+            if ssh:
+                print 'Remote extracting not yet supported'
+                return
             nwrite = 0
             nat = 0
             for atoms in box.find(auth_token=token, filter=query, 
@@ -195,6 +202,9 @@ def run(args, verbosity):
             out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
 
         elif args.add_from_file:
+            if ssh:
+                print 'Remote adding not yet supported'
+                return
             if query:
                 print 'Ignoring query:', query
 
