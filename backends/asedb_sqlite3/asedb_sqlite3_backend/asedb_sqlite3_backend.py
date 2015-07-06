@@ -86,6 +86,7 @@ class ASEdbSQlite3Backend(Backend):
     def insert(self, auth_token, atoms):
         ids = []
         if isinstance(atoms, Atoms):
+            atoms.info.pop['id', None]
             ids.append(self.connection.write(atoms=atoms, add_from_info_and_arrays=True))
         else:
             # Assume it's an iterator
@@ -95,7 +96,6 @@ class ASEdbSQlite3Backend(Backend):
         return results.InsertResult(inserted_ids=ids, msg=msg)
 
     def remove(self, auth_token, filter, just_one):
-        # TODO: don't select everything when there is a limit specified
         if just_one:
             limit = 1
         else:

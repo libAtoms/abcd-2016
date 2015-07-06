@@ -1,7 +1,7 @@
 __author__ = 'Martin Uhrin'
 
 import random
-
+from ase.utils import hill
 
 def atoms2dict(atoms, include_all_data=False):
     dct = {
@@ -32,7 +32,7 @@ def atoms2dict(atoms, include_all_data=False):
         # add scalars from Atoms.info to dct['key_value_pairs'] and arrays to dct['data']
         kvp = dct['key_value_pairs'] = {}
         data = dct['data'] = {}
-        skip_keys = ['calculator', 'id', 'unique_id']
+        skip_keys = ['unique_id'] #['calculator', 'id', 'unique_id']
         for (key, value) in atoms.info.items():
             key = key.lower()
             if key in skip_keys:
@@ -54,3 +54,48 @@ def atoms2dict(atoms, include_all_data=False):
             data[key] = value
 
     return dct
+
+def atoms_it2table(atoms_it):
+    table = []
+    for atoms in atoms_it:
+        old_dict = atoms2dict(atoms, True)
+        
+        new_dict = dict(old_dict)
+        new_dict.pop('key_value_pairs', None)
+        new_dict.pop('data', None)
+
+        if old_dict['key_value_pairs']:
+            for key, value in old_dict['key_value_pairs'].iteritems():
+                new_dict[key] = old_dict['key_value_pairs'][key]
+
+        new_dict['formula'] = (hill(atoms.numbers))
+
+        table.append(new_dict)
+
+    keys = set()
+    for dct in table:
+        for key in dct:
+            keys.add(key)
+    keys_list = list(keys)
+
+    # Reorder the list
+    order = ['id', 'user', 'ctime', 'formula']
+    for key in reversed(order):
+        if key in keys_list:
+            keys_list.insert(0, keys_list.pop(keys_list.index(key)))
+
+    from prettytable import PrettyTable
+    t = PrettyTable(keys_list)
+    t.padding_width = 0
+    for dct in table:
+        lst = []
+        for key in keys_list:
+            if key in dct:
+                value = dct[key]
+                value = str(value)
+                value = (value[:10] + '..') if len(value) > 10 else value
+            else:
+                value = '-'
+            lst.append(value)
+        t.add_row(lst)
+    return t.get_string()

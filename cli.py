@@ -7,7 +7,7 @@ import subprocess
 
 from abcd.authentication import Credentials
 from abcd.structurebox import StructureBox
-from abcd.util import atoms2dict
+from abcd.util import atoms2dict, atoms_it2table
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -61,8 +61,8 @@ def main(args = sys.argv[1:]):
         help='Extract an original file stored with -o/--store-original-file')
     add('--add-from-file', metavar='(type:)filename...',
         help='Add results from file.')
-    add('--keys', action='store_true', default=False, 
-        help='Show available keys')
+    add('--count', action='store_true',
+        help='Count number of selected rows.')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -215,25 +215,16 @@ def run(args, verbosity):
             box.insert(token, atoms)
             out('Added {0} from {1}'.format(atoms.get_chemical_formula(), filename))
 
-        # Takes the first row of the database and prints its keys
-        elif args.keys:
-            atoms_it = box.find(auth_token=token, filter='', limit=1)
-            try:
-                atoms = atoms_it.next()
-                print ('The following keys are present (there might be more but'
-                    ' they were stripped by the atoms2dict function):')
-                print atoms2dict(atoms, True).keys()
-            except StopIteration:
-                print 'The database is empty'
+        elif args.count:
+            atoms_it = box.find(auth_token=token, filter=query, 
+                            sort=args.sort, limit=args.limit)
+            print plural(atoms_it.count(), 'row')
            
         else:
             # If there was a query, print number of configurations found
             # If there was no query, print the whole database
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
-            count = 0
-            for ats in atoms_it:
-                count += 1
-            print plural(count, 'row'), 'match'
-
+            print atoms_it2table(atoms_it)
+            
 main()
