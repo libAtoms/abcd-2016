@@ -50,9 +50,10 @@ class ASEdbSQlite3Backend(Backend):
         # root_dir is the directory in which user's databases are stored
         self.root_dir = os.path.join(self.dbs_path, home)
 
-        # Connect to the database if it was supplied as an argument
+        # Try to connect to the database if it was supplied as an argument
         if database:
-            self.connect_to_database(database)
+            if not self.connect_to_database(database):
+                raise Exception('{} does not exist'.format(database))
 
         super(ASEdbSQlite3Backend, self).__init__()
 
@@ -79,9 +80,18 @@ class ASEdbSQlite3Backend(Backend):
         return credentials.username
 
     def connect_to_database(self, database):
+        '''
+        Connects to the database if it exists.
+        If it doesn't exist, a new database is created,
+        but this is only possible for the local user.
+        '''
         database = os.path.basename(database)
         file_path = os.path.join(self.root_dir, database)
+
+        if not os.path.exists(file_path) and self.user:
+            return False
         self.connection = connect(file_path)
+        return True
 
     def insert(self, auth_token, atoms):
         ids = []

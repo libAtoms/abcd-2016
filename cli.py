@@ -109,10 +109,35 @@ def run(args, verbosity):
         # Execute the ssh command, capture the output
         try:
             output = subprocess.check_output(command, shell=True)
-            print output
         except subprocess.CalledProcessError as e:
             print e.output
             sys.exit()
+
+        if args.write_to_file:
+            filename = args.write_to_file
+            with open(filename, 'w') as f:
+                f.write(output)
+
+        elif args.extract_original_file:
+            nwrite = 0
+            nat = 0
+            files = output.split('@@@FILE ')[1:]
+            for file_string in files:
+                nat += 1
+                filename, file_contents = file_string.split('\n', 1)
+                if os.path.exists(filename):
+                    out('original_file_name %s already exists in current ' %
+                        filename + 'working directory, skipping write')
+                    continue
+                                                
+                with open(filename, 'w') as f:
+                    f.write(file_contents)
+                nwrite += 1
+
+            out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
+
+        else:
+            print output
 
     else:
         if not args.user and not args.remote:
@@ -148,9 +173,10 @@ def run(args, verbosity):
 
         elif args.write_to_file:
             if ssh:
-                print 'Remote writing not yet supported'
-                return
-            filename = args.write_to_file
+                filename = '-'
+            else:
+                filename = args.write_to_file
+
             if '.' in filename:
                 format = filename.split('.')[1]
             else:
@@ -173,13 +199,10 @@ def run(args, verbosity):
                     if format is None: format = 'extxyz'
                     filename = sys.stdout
                 ase_write(filename, list_of_atoms, format=format)
-
-            out('Wrote %d rows.' % len(list_of_atoms))
+            if not ssh:
+                out('Wrote %d rows.' % len(list_of_atoms))
 
         elif args.extract_original_file:
-            if ssh:
-                print 'Remote extracting not yet supported'
-                return
             nwrite = 0
             nat = 0
             for atoms in box.find(auth_token=token, filter=query, 
@@ -187,23 +210,33 @@ def run(args, verbosity):
                 nat += 1
                 if ('original_file_name' not in atoms.info or
                     'original_file_contents' not in atoms.info):
-                    out('no original file stored for configuration %d' % nat)
-                    continue
+                    err = 'no original file stored for configuration %d' % nat
+                    if ssh:
+                        raise Exception(err)
+                    else:
+                        out(err)
                 original_file_name = atoms.info['original_file_name']
 
                 # Restore to current working directory
                 original_file_name = os.path.basename(original_file_name)
-                if os.path.exists(original_file_name):
-                    out('original_file_name %s already exists in current ' %
-                         original_file_name + 'working directory, skipping write')
-                    continue
 
-                out('Writing %s' % original_file_name)            
-                with open(original_file_name, 'w') as original_file:
-                    original_file.write(atoms.info['original_file_contents'])
+                if ssh:
+                    print '@@@FILE', original_file_name
+                    print atoms.info['original_file_contents']
+                else:
+
+                    if os.path.exists(original_file_name):
+                        out('original_file_name %s already exists in current ' %
+                             original_file_name + 'working directory, skipping write')
+                        continue
+
+                    out('Writing %s' % original_file_name)            
+                    with open(original_file_name, 'w') as original_file:
+                        original_file.write(atoms.info['original_file_contents'])
                 nwrite += 1
 
-            out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
+            if not ssh:
+                out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
 
         elif args.add_from_file:
             if ssh:
@@ -242,3 +275,4 @@ def run(args, verbosity):
             print atoms_it2table(atoms_it)
             
 main()
+
