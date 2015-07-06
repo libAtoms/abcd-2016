@@ -63,6 +63,8 @@ def main(args = sys.argv[1:]):
         help='Add results from file.')
     add('--count', action='store_true',
         help='Count number of selected rows.')
+    add('--no-confirmation', action='store_true',
+        help='Don\'t ask for confirmation')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -140,7 +142,8 @@ def run(args, verbosity):
             if ssh:
                 print 'Remote removing not yet supported'
                 return
-            result = box.remove(token, query, just_one=False)
+            result = box.remove(token, query, just_one=False, 
+                                confirm=not args.no_confirmation)
             print result.msg
 
         elif args.write_to_file:
