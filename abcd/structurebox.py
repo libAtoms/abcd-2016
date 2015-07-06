@@ -36,6 +36,6 @@ class StructureBox(object):
         with StructureBox.BackendOpen(self.backend):
             return self.backend.find(auth_token, filter, sort, limit)
 
-    def remove(self, auth_token, filter, just_one=True):
+    def remove(self, auth_token, filter, just_one=True, confirm=True):
         with StructureBox.BackendOpen(self.backend):
-            return self.backend.remove(auth_token, filter, just_one)
+            return self.backend.remove(auth_token, filter, just_one, confirm)

@@ -45,7 +45,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def remove(self, auth_token, filter, just_one):
+    def remove(self, auth_token, filter, just_one, confirm):
         """
         Remove entries from the databse that match the filter
 
@@ -53,6 +53,7 @@ class Backend(object):
         :param filter: Filter (in MongoDB query language)
         :type filter: dictionary?
         :param bool just_one: remove not more than one entry
+        :param bool confirm: confirm before removing
         :return: Returns a result that holds the number of removed
             entries and a message
         :rtype: RemoveResult

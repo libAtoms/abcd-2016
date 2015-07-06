@@ -95,12 +95,17 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Inserted {} configurations'.format(len(ids))
         return results.InsertResult(inserted_ids=ids, msg=msg)
 
-    def remove(self, auth_token, filter, just_one):
+    def remove(self, auth_token, filter, just_one, confirm):
         if just_one:
             limit = 1
         else:
             limit = 0
         ids = [dct['id'] for dct in self.connection.select(filter, limit=limit)]
+        if confirm:
+            msg = 'Delete {}? (yes/no): '.format(plural(len(ids), 'row'))
+            if raw_input(msg).lower() != 'yes':
+                return results.RemoveResult(removed_count=0, 
+                                            msg='Operation aborted by the user')
         self.connection.delete(ids)
         msg = 'Deleted {}'.format(plural(len(ids), 'row'))
         return results.RemoveResult(removed_count=len(ids), msg=msg)

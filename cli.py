@@ -140,7 +140,8 @@ def run(args, verbosity):
             if ssh:
                 print 'Remote removing not yet supported'
                 return
-            box.remove(token, query, False)
+            result = box.remove(token, query, just_one=False)
+            print result.msg
 
         elif args.write_to_file:
             if ssh:
