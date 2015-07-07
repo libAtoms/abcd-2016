@@ -234,25 +234,29 @@ def run(args, verbosity):
                     'original_file_contents' not in atoms.info):
                     skipped_configs.append(nat)
                     continue
+                
                 original_file_name = atoms.info['original_file_name']
-
                 # Restore to current working directory
                 original_file_name = os.path.basename(original_file_name)
 
+                # Add the file to the tar file
                 if ssh:
                     filestring = StringIO.StringIO(atoms.info['original_file_contents'])
                     info = tarfile.TarInfo(name=original_file_name)
                     info.size=len(filestring.buf)
                     tar.addfile(tarinfo=info, fileobj=filestring)
+                # Write the file locally
                 else:
+                    new_path = os.path.join(args.target, original_file_name)
 
-                    if os.path.exists(original_file_name):
-                        out('original_file_name %s already exists in current ' %
-                             original_file_name + 'working directory, skipping write')
+                    if not os.path.exists(os.path.dirname(new_path)):
+                        os.makedirs(os.path.dirname(new_path))
+                    elif os.path.exists(new_path):
+                        print('{} already exists, skipping write.'.format(new_path))
                         continue
 
-                    out('Writing %s' % original_file_name)            
-                    with open(original_file_name, 'w') as original_file:
+                    out('Writing %s' % new_path)            
+                    with open(new_path, 'w') as original_file:
                         original_file.write(atoms.info['original_file_contents'])
                 nwrite += 1
 
