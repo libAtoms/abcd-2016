@@ -10,7 +10,7 @@ import StringIO
 
 from abcd.authentication import Credentials
 from abcd.structurebox import StructureBox
-from abcd.util import atoms2dict, atoms_it2table, pretty_table, keys_intersection, keys_union
+from abcd.util import atoms2dict, Table
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -321,16 +321,29 @@ def run(args, verbosity):
         elif args.keys:
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
-            table = atoms_it2table(atoms_it)
-            print('  Union of keys:', *keys_union(table))
-            print('  Intersection of keys:', *keys_intersection(table))
+            table = Table(atoms_it)
+            union = table.keys_union()
+            intersection = table.keys_intersection()
+
+            ranges = {}
+            for key in union:
+                ranges[key] = table.values_range(key)
+
+            print('Union of keys:')
+            for key in union:
+                print('    {}: {}'.format(key, ranges[key]))
+
+            print('Intersection of keys:')
+            for key in intersection:
+                print('    {}: {}'.format(key, ranges[key]))
            
         # If there was a query, print number of configurations found
         # If there was no query, print the whole database
         else:    
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
-            print(pretty_table(atoms_it))
+            table = Table(atoms_it)
+            print(table)
             
 main()
 

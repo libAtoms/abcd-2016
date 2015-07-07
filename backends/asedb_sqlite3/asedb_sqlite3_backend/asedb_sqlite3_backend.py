@@ -96,7 +96,7 @@ class ASEdbSQlite3Backend(Backend):
     def insert(self, auth_token, atoms):
         ids = []
         if isinstance(atoms, Atoms):
-            atoms.info.pop['id', None]
+            atoms.info.pop('id', None)
             ids.append(self.connection.write(atoms=atoms, add_from_info_and_arrays=True))
         else:
             # Assume it's an iterator

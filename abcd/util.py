@@ -2,6 +2,10 @@ __author__ = 'Martin Uhrin'
 
 import random
 from ase.utils import hill
+import time
+
+T2000 = 946681200.0  # January 1. 2000
+YEAR = 31557600.0  # 365.25 days
 
 def atoms2dict(atoms, include_all_data=False):
     dct = {
@@ -62,6 +66,7 @@ def trim(str, length):
         return str
 
 def atoms_it2table(atoms_it):
+    '''Table is a list of dicts'''
     table = []
     for atoms in atoms_it:
         old_dict = atoms2dict(atoms, True)
@@ -77,12 +82,46 @@ def atoms_it2table(atoms_it):
         new_dict['formula'] = (hill(atoms.numbers))
 
         table.append(new_dict)
+    return table
 
+def keys_union(table):
     keys = set()
     for dct in table:
         for key in dct:
             keys.add(key)
-    keys_list = list(keys)
+    return list(keys)
+
+def keys_intersection(table):
+    if table:
+        keys = set(list(table[0].keys()))
+    else:
+        return set()
+    for dct in table[1:]:
+        new_keys = set()
+        for key in dct:
+            new_keys.add(key)
+        keys = keys & new_keys
+    return list(keys)
+
+def values_range(table, key):
+    values = []
+    for dct in table:
+        if key in dct:
+            values.append(dct[key])
+    if not values:
+        return None
+    elif len(values) == 1:
+        return (values[0])
+    else:
+        try:
+            ret = (min(values), max(values))
+        except:
+            ret = values[0].__class__
+        return ret
+
+def pretty_table(atoms_it):
+    table = atoms_it2table(atoms_it)
+    keys_list = keys_union(table)
 
     # Reorder the list
     order = ['id', 'ctime', 'user', 'formula', 'config_type', 'calculator', 
@@ -100,6 +139,8 @@ def atoms_it2table(atoms_it):
         for key in keys_list:
             if key in dct:
                 value = dct[key]
+                if key == 'ctime':
+                    value = time.strftime('%d/%m/%y %H:%M:%S', time.localtime(value*YEAR+T2000))
                 value = trim(str(value), 10)
             else:
                 value = '-'
