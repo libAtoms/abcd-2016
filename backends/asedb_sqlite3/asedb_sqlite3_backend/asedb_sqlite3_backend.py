@@ -125,9 +125,15 @@ class ASEdbSQlite3Backend(Backend):
             sort = 'id'
         rows_iter = self.connection.select(filter, sort=sort, limit=limit)
 
+        def row2atoms(row):
+            atoms = row.toatoms(add_to_info_and_arrays=True)
+            atoms.info['id'] = row.id
+            atoms.info['user'] = row.user
+            atoms.info['ctime'] = row.ctime
+            return atoms
+
         # Convert it to the Atoms iterator.
-        return ASEdbSQlite3Backend.Cursor(
-                    imap(lambda x: x.toatoms(add_to_info_and_arrays=True), rows_iter))
+        return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
 
     def open(self):
         pass
