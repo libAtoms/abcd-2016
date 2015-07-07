@@ -10,7 +10,7 @@ import StringIO
 
 from abcd.authentication import Credentials
 from abcd.structurebox import StructureBox
-from abcd.util import atoms2dict, atoms_it2table
+from abcd.util import atoms2dict, atoms_it2table, pretty_table, keys_intersection, keys_union
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -69,6 +69,7 @@ def main(args = sys.argv[1:]):
     add('--no-confirmation', action='store_true',
         help='Don\'t ask for confirmation')
     add('--target', default='.', help='Target directory for saving files')
+    add('--keys', action='store_true', help='Display information about available keys')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -316,13 +317,20 @@ def run(args, verbosity):
             atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, limit=args.limit)
             print(plural(atoms_it.count(), 'row'))
+
+        elif args.keys:
+            atoms_it = box.find(auth_token=token, filter=query, 
+                                sort=args.sort, limit=args.limit)
+            table = atoms_it2table(atoms_it)
+            print('  Union of keys:', *keys_union(table))
+            print('  Intersection of keys:', *keys_intersection(table))
            
         # If there was a query, print number of configurations found
         # If there was no query, print the whole database
         else:    
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
-            print(atoms_it2table(atoms_it))
+            print(pretty_table(atoms_it))
             
 main()
 
