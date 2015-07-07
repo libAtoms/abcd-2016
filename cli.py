@@ -118,15 +118,19 @@ def run(args, verbosity):
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         
+        # An error occured at the remote end when running the command.
+        # Print stdout sa it might contain the error.
         if process.returncode:
             warning('An error occured')
             print(stdout)
 
+        # Write the received string to a file
         elif args.write_to_file:
             filename = args.write_to_file
             with open(filename, 'w') as f:
                 f.write(stdout)
 
+        # Unpack the received tar
         elif args.extract_original_file:
             s = StringIO.StringIO(stdout)
             try:
@@ -152,6 +156,7 @@ def run(args, verbosity):
         warning(stderr)
 
     else:
+        # Detect if the script is running over ssh
         if not args.user and not args.remote:
             ssh = False
         else:
@@ -159,6 +164,8 @@ def run(args, verbosity):
 
         if not backend_enabled:
             raise Exception('The backend could not be imported')
+
+        # Try to initialise the backend
         try:
             box = StructureBox(ASEdbSQlite3Backend(database=args.database, user=args.user))
             token = box.authenticate(Credentials(args.user))
@@ -166,6 +173,7 @@ def run(args, verbosity):
             print('An error occured: ', str(e))
             return
 
+        # List all available databases
         if args.list:
             print(box.list_databases())
             return
@@ -179,6 +187,7 @@ def run(args, verbosity):
         if query and query.isdigit():
             query = int(query)
 
+        # Remove entries from a database
         if args.remove:
             if ssh:
                 warning('Remote removing not yet supported')
@@ -187,6 +196,8 @@ def run(args, verbosity):
                                 confirm=not args.no_confirmation)
             print(result.msg)
 
+        # Extract a configuration from the database and write it
+        # to the specified file.
         elif args.write_to_file:
             if ssh:
                 filename = '-'
@@ -218,7 +229,11 @@ def run(args, verbosity):
             if not ssh:
                 out('Wrote %d rows.' % len(list_of_atoms))
 
+        # Extract original file(s) from the database and write them
+        # to the directory specified by the --target argument 
+        # (current directory by default).
         elif args.extract_original_file:
+
             # If over ssh, create a tar file in memory
             if ssh:
                 c = StringIO.StringIO()
@@ -271,6 +286,7 @@ def run(args, verbosity):
             else:
                 out(msg)
 
+        # Add a configuration from a file to the specified database
         elif args.add_from_file:
             if ssh:
                 warning('Remote adding not yet supported')
@@ -295,14 +311,15 @@ def run(args, verbosity):
             box.insert(token, atoms)
             out('Added {0} from {1}'.format(atoms.get_chemical_formula(), filename))
 
+        # Count selected configuration
         elif args.count:
             atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, limit=args.limit)
             print(plural(atoms_it.count(), 'row'))
            
-        else:
-            # If there was a query, print number of configurations found
-            # If there was no query, print the whole database
+        # If there was a query, print number of configurations found
+        # If there was no query, print the whole database
+        else:    
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
             print(atoms_it2table(atoms_it))
