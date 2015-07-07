@@ -1,9 +1,12 @@
 #! /usr/bin/env python
+from __future__ import print_function
 
 import os
 import sys
 import argparse
 import subprocess
+import tarfile
+import StringIO
 
 from abcd.authentication import Credentials
 from abcd.structurebox import StructureBox
@@ -65,6 +68,7 @@ def main(args = sys.argv[1:]):
         help='Count number of selected rows.')
     add('--no-confirmation', action='store_true',
         help='Don\'t ask for confirmation')
+    add('--target', default='.', help='Target directory for saving files')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -82,12 +86,17 @@ def main(args = sys.argv[1:]):
 def run(args, verbosity):
 
     def out(*args):
+        '''Prints information in accordance to verbosity'''
         if verbosity > 0:
-            print ' '.join(args)
+            print(*args)
+
+    def warning(*objs):
+        '''Prints the warning to stderr'''
+        print(*objs, file=sys.stderr)
 
     # User specified the "user" argument, quit.
     if args.user and args.remote:
-        print 'Unknown option --user. Terminating'
+        warning('Unknown option --user. Terminating')
         sys.exit()
 
     # Query to the remote server. Remove the --remote argumnet and 
@@ -105,39 +114,42 @@ def run(args, verbosity):
         arguments = ' '.join(sys.argv[1:])
         arguments = '\' {}\''.format(arguments)
         command = ssh_call + arguments
-        
-        # Execute the ssh command, capture the output
-        try:
-            output = subprocess.check_output(command, shell=True)
-        except subprocess.CalledProcessError as e:
-            print e.output
-            sys.exit()
 
-        if args.write_to_file:
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        
+        if process.returncode:
+            warning('An error occured')
+            print(stdout)
+
+        elif args.write_to_file:
             filename = args.write_to_file
             with open(filename, 'w') as f:
-                f.write(output)
+                f.write(stdout)
 
         elif args.extract_original_file:
-            nwrite = 0
-            nat = 0
-            files = output.split('@@@FILE ')[1:]
-            for file_string in files:
-                nat += 1
-                filename, file_contents = file_string.split('\n', 1)
-                if os.path.exists(filename):
-                    out('original_file_name %s already exists in current ' %
-                        filename + 'working directory, skipping write')
-                    continue
-                                                
-                with open(filename, 'w') as f:
-                    f.write(file_contents)
-                nwrite += 1
-
-            out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
-
+            s = StringIO.StringIO(stdout)
+            try:
+                tar = tarfile.open(fileobj=s, mode='r')
+                no_files = len(tar.getmembers())
+                print('Writing {} files to {}/'.format(no_files, args.target))
+                tar.extractall(path=args.target)
+            except tarfile.ReadError:
+                warning('Received file could not be read')
+                return
+            except tarfile.ExtractError:
+                warning('Could not extract configurations')
+                return
+            except:
+                warning('A fatal error occured')
+                return
+            finally:
+                tar.close()
         else:
-            print output
+            print(stdout)
+
+        # Print any warnings
+        warning(stderr)
 
     else:
         if not args.user and not args.remote:
@@ -147,11 +159,15 @@ def run(args, verbosity):
 
         if not backend_enabled:
             raise Exception('The backend could not be imported')
-        box = StructureBox(ASEdbSQlite3Backend(database=args.database, user=args.user))
-        token = box.authenticate(Credentials(args.user))
+        try:
+            box = StructureBox(ASEdbSQlite3Backend(database=args.database, user=args.user))
+            token = box.authenticate(Credentials(args.user))
+        except Exception as e:
+            print('An error occured: ', str(e))
+            return
 
         if args.list:
-            print box.list_databases()
+            print(box.list_databases())
             return
 
         # Beyond this point a database has to be specified
@@ -165,11 +181,11 @@ def run(args, verbosity):
 
         if args.remove:
             if ssh:
-                print 'Remote removing not yet supported'
+                warning('Remote removing not yet supported')
                 return
             result = box.remove(token, query, just_one=False, 
                                 confirm=not args.no_confirmation)
-            print result.msg
+            print(result.msg)
 
         elif args.write_to_file:
             if ssh:
@@ -203,26 +219,31 @@ def run(args, verbosity):
                 out('Wrote %d rows.' % len(list_of_atoms))
 
         elif args.extract_original_file:
+            # If over ssh, create a tar file in memory
+            if ssh:
+                c = StringIO.StringIO()
+                tar = tarfile.open(fileobj=c, mode='w')
+
             nwrite = 0
             nat = 0
+            skipped_configs = []
             for atoms in box.find(auth_token=token, filter=query, 
                             sort=args.sort, limit=args.limit):
                 nat += 1
                 if ('original_file_name' not in atoms.info or
                     'original_file_contents' not in atoms.info):
-                    err = 'no original file stored for configuration %d' % nat
-                    if ssh:
-                        raise Exception(err)
-                    else:
-                        out(err)
+                    skipped_configs.append(nat)
+                    continue
                 original_file_name = atoms.info['original_file_name']
 
                 # Restore to current working directory
                 original_file_name = os.path.basename(original_file_name)
 
                 if ssh:
-                    print '@@@FILE', original_file_name
-                    print atoms.info['original_file_contents']
+                    filestring = StringIO.StringIO(atoms.info['original_file_contents'])
+                    info = tarfile.TarInfo(name=original_file_name)
+                    info.size=len(filestring.buf)
+                    tar.addfile(tarinfo=info, fileobj=filestring)
                 else:
 
                     if os.path.exists(original_file_name):
@@ -235,15 +256,23 @@ def run(args, verbosity):
                         original_file.write(atoms.info['original_file_contents'])
                 nwrite += 1
 
-            if not ssh:
-                out('Extracted original output files for %d/%d selected configurations' % (nwrite, nat))
+            msg = 'Extracted original output files for %d/%d selected configurations' % (nwrite, nat)
+            if skipped_configs:
+                msg += '\nNo original file stored for configurations {}'.format(skipped_configs)
+
+            if ssh:
+                print(c.getvalue())
+                warning(msg)
+                tar.close()
+            else:
+                out(msg)
 
         elif args.add_from_file:
             if ssh:
-                print 'Remote adding not yet supported'
+                warning('Remote adding not yet supported')
                 return
             if query:
-                print 'Ignoring query:', query
+                warning('Ignoring query:', query)
 
             filename = args.add_from_file
             if ':' in filename:
@@ -265,14 +294,14 @@ def run(args, verbosity):
         elif args.count:
             atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, limit=args.limit)
-            print plural(atoms_it.count(), 'row')
+            print(plural(atoms_it.count(), 'row'))
            
         else:
             # If there was a query, print number of configurations found
             # If there was no query, print the whole database
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
-            print atoms_it2table(atoms_it)
+            print(atoms_it2table(atoms_it))
             
 main()
 
