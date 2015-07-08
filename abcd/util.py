@@ -137,7 +137,9 @@ class Table:
         for dct in self.dicts:
             for key in dct:
                 keys.add(key)
-        return list(keys)
+        ret = sorted(list(keys))
+        print ret
+        return ret
 
     def keys_intersection(self):
         if self.dicts:
@@ -149,25 +151,31 @@ class Table:
             for key in dct:
                 new_keys.add(key)
             keys = keys & new_keys
-        return list(keys)
+        ret = sorted(list(keys))
+        print ret
+        return ret
 
     def print_keys_table(self):
         union = self.keys_union()
         intersection = self.keys_intersection()
         ranges = {key: self.values_range(key) for key in union}
 
-        t = PrettyTable(['Key', 'Min', 'Max'])
-        t.padding_width = 0
-        t.align["Key"] = "l"
+        t_intersection = PrettyTable(['Key', 'Min', 'Max'])
+        t_intersection.padding_width = 0
+        t_intersection.align["Key"] = "l"
 
         print '\nINTERSECTION:'
-        for key in union:
-            row = [key, ranges[key][0], ranges[key][1]]
-            t.add_row([self._trim(str(el), 15) for el in row])
-        print t
-
-        print '\nUNION:'
         for key in intersection:
             row = [key, ranges[key][0], ranges[key][1]]
-            t.add_row([self._trim(str(el), 15) for el in row])
-        print t
+            t_intersection.add_row([self._trim(str(el), 15) for el in row])
+        print t_intersection
+
+        t_union = PrettyTable(['Key', 'Min', 'Max'])
+        t_union.padding_width = 0
+        t_union.align["Key"] = "l"
+
+        print '\nUNION:'
+        for key in union:
+            row = [key, ranges[key][0], ranges[key][1]]
+            t_union.add_row([self._trim(str(el), 15) for el in row])
+        print t_union
