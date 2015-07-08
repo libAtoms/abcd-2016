@@ -326,9 +326,18 @@ def run(args, verbosity):
 
         # Count selected configuration
         elif args.count:
+            if args.limit == 0:
+                lim = 0
+            else:
+                lim = args.limit + 1
             atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit)
-            print(plural(atoms_it.count(), 'row'))
+                            sort=args.sort, limit=lim)
+            count = atoms_it.count()
+            if args.limit != 0 and count > args.limit:
+                count = '{}+'.format(count-1)
+            else:
+                count = str(count)
+            print('Found:', count)
 
         elif args.keys:
             atoms_it = box.find(auth_token=token, filter=query, 
