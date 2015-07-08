@@ -137,9 +137,7 @@ class Table:
         for dct in self.dicts:
             for key in dct:
                 keys.add(key)
-        ret = sorted(list(keys))
-        print ret
-        return ret
+        return sorted(list(keys))
 
     def keys_intersection(self):
         if self.dicts:
@@ -151,9 +149,7 @@ class Table:
             for key in dct:
                 new_keys.add(key)
             keys = keys & new_keys
-        ret = sorted(list(keys))
-        print ret
-        return ret
+        return sorted(list(keys))
 
     def print_keys_table(self):
         union = self.keys_union()
