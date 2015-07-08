@@ -160,13 +160,13 @@ class Table:
         t.padding_width = 0
         t.align["Key"] = "l"
 
-        print '\nUNION:'
+        print '\nINTERSECTION:'
         for key in union:
             row = [key, ranges[key][0], ranges[key][1]]
             t.add_row([self._trim(str(el), 15) for el in row])
         print t
 
-        print '\nINTERSECTION:'
+        print '\nUNION:'
         for key in intersection:
             row = [key, ranges[key][0], ranges[key][1]]
             t.add_row([self._trim(str(el), 15) for el in row])
