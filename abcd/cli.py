@@ -8,9 +8,9 @@ import subprocess
 import tarfile
 import StringIO
 
-from abcd.authentication import Credentials
-from abcd.structurebox import StructureBox
-from abcd.util import atoms2dict, Table
+from authentication import Credentials
+from structurebox import StructureBox
+from util import atoms2dict, Table
 
 from ase.utils import plural
 from ase.io import read as ase_read

@@ -34,3 +34,12 @@ class InsertResult(Result):
     @property
     def inserted_ids(self):
         return self._inserted_ids
+
+class UpdateResult(Result):
+    def __init__(self, updated_ids, msg=None):
+        self.updated_ids = updated_ids
+        super(UpdateResult, self).__init__(msg)
+
+    @property
+    def updated_ids(self):
+        return self.updated_ids

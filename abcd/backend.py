@@ -45,6 +45,20 @@ class Backend(object):
         pass
 
     @abstractmethod
+    def update(self, auth_token, atoms):
+        '''
+        Take the atoms object and find an entry in the database with 
+        the same unique id. If one exists, the old entry gets updated 
+        with the new entry.
+        :param AuthToken auth_token: Authorisation token
+        :param atoms: Atoms to insert
+        :type atoms: Atoms or Atoms iterable
+        :return:
+        :rtype: UpdateResult
+        '''
+        pass
+
+    @abstractmethod
     def remove(self, auth_token, filter, just_one, confirm):
         """
         Remove entries from the databse that match the filter

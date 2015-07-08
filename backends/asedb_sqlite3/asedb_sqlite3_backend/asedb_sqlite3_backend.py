@@ -10,6 +10,8 @@ from ase.db import connect
 from ase.utils import plural
 from ase.atoms import Atoms
 
+from random import randint
+
 class ASEdbSQlite3Backend(Backend):
 
     class Cursor(abcd.backend.Cursor):
@@ -98,17 +100,25 @@ class ASEdbSQlite3Backend(Backend):
         self.connection = connect(file_path)
         return True
 
+    def _insert_atoms(self, atoms):
+        atoms.info.pop('id', None)
+        if not 'unique_id' in atoms.info:
+            atoms.info['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
+        return self.connection.write(atoms=atoms, add_from_info_and_arrays=True)
+
     def insert(self, auth_token, atoms):
         ids = []
         if isinstance(atoms, Atoms):
-            atoms.info.pop('id', None)
-            ids.append(self.connection.write(atoms=atoms, add_from_info_and_arrays=True))
+            ids.append(self._insert_atoms(atoms))
         else:
             # Assume it's an iterator
             for ats in atoms:
-                ids.append(self.connection.write(atoms=ats, add_from_info_and_arrays=True))
+                ids.append(self._insert_atoms(atoms))
         msg = 'Inserted {} configurations'.format(len(ids))
         return results.InsertResult(inserted_ids=ids, msg=msg)
+
+    def update(self, auth_token, atoms):
+        pass
 
     def remove(self, auth_token, filter, just_one, confirm):
         if just_one:
