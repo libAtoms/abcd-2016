@@ -16,6 +16,7 @@ from ase.utils import plural
 from ase.io import read as ase_read
 from ase.io import write as ase_write
 from ase.db.summary import Summary
+from ase.calculators.calculator import get_calculator
 
 # Try to import the interface. If it fails, the script only has limited
 # functionality (only remote querying without saving).
@@ -133,6 +134,9 @@ def run(args, verbosity):
 
         # Unpack the received tar
         elif args.extract_original_file:
+            if stdout.isspace():
+                warning(stderr)
+                return
             s = StringIO.StringIO(stdout)
             try:
                 tar = tarfile.open(fileobj=s, mode='r')
@@ -150,11 +154,10 @@ def run(args, verbosity):
                 return
             finally:
                 tar.close()
+                warning(stderr)
         else:
             print(stdout)
-
-        # Print any warnings
-        warning(stderr)
+            warning(stderr)
 
     else:
         # Detect if the script is running over ssh
