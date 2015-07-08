@@ -28,14 +28,23 @@ except ImportError:
 
 description = ''
 
-examples = ['']
+examples = '''
+    abcd.py --remote abcd@gc121mac1 db1.db   (display the database)
+    abcd.py --remote abcd@gc121mac1 db1.db --keys   (display information about available keys)
+    abcd.py --remote abcd@gc121mac1 db1.db \'energy<0.6,id>4\'   (querying)
+    abcd.py --remote abcd@gc121mac1 db1.db --extract-original-file --target extracted   (extract files to the extracted/ folder)
+    abcd.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
+    abcd.py db1.db \'energy>0.7\' --count   (count number of selected rows)
+    abcd.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
+    abcd.py --add-from-file source.xyz db1.db   (add file to the database)
+'''
 
 def main(args = sys.argv[1:]):
     if isinstance(args, str):
         args = args.split(' ')
     parser = argparse.ArgumentParser(usage = 'Usage: %%prog [db-name] [selection] [options]',
                         description = description,
-                        epilog = 'Selection examples: ' + ', '.join(examples) + '.',
+                        epilog = 'Examples: ' + examples,
                         formatter_class=argparse.RawTextHelpFormatter)
 
     # Display usage if no arguments are supplied
