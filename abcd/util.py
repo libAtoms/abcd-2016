@@ -59,91 +59,95 @@ def atoms2dict(atoms, include_all_data=False):
 
     return dct
 
-def trim(str, length):
-    if len(str) > length:
-        return (str[:length] + '..')
-    else:
-        return str
+class Table:
+    '''
+    Class that holds a list of dictionaries (created from the Atoms object).
+    '''
+    def __init__(self, atoms_it):
+        self.dicts = []
+        for atoms in atoms_it:
+            old_dict = atoms2dict(atoms, True)
+            
+            new_dict = dict(old_dict)
+            new_dict.pop('key_value_pairs', None)
+            new_dict.pop('data', None)
 
-def atoms_it2table(atoms_it):
-    '''Table is a list of dicts'''
-    table = []
-    for atoms in atoms_it:
-        old_dict = atoms2dict(atoms, True)
-        
-        new_dict = dict(old_dict)
-        new_dict.pop('key_value_pairs', None)
-        new_dict.pop('data', None)
+            if old_dict['key_value_pairs']:
+                for key, value in old_dict['key_value_pairs'].iteritems():
+                    new_dict[key] = old_dict['key_value_pairs'][key]
 
-        if old_dict['key_value_pairs']:
-            for key, value in old_dict['key_value_pairs'].iteritems():
-                new_dict[key] = old_dict['key_value_pairs'][key]
+            new_dict['formula'] = (hill(atoms.numbers))
+            self.dicts.append(new_dict)
 
-        new_dict['formula'] = (hill(atoms.numbers))
+    def __str__(self):
 
-        table.append(new_dict)
-    return table
-
-def keys_union(table):
-    keys = set()
-    for dct in table:
-        for key in dct:
-            keys.add(key)
-    return list(keys)
-
-def keys_intersection(table):
-    if table:
-        keys = set(list(table[0].keys()))
-    else:
-        return set()
-    for dct in table[1:]:
-        new_keys = set()
-        for key in dct:
-            new_keys.add(key)
-        keys = keys & new_keys
-    return list(keys)
-
-def values_range(table, key):
-    values = []
-    for dct in table:
-        if key in dct:
-            values.append(dct[key])
-    if not values:
-        return None
-    elif len(values) == 1:
-        return (values[0])
-    else:
-        try:
-            ret = (min(values), max(values))
-        except:
-            ret = values[0].__class__
-        return ret
-
-def pretty_table(atoms_it):
-    table = atoms_it2table(atoms_it)
-    keys_list = keys_union(table)
-
-    # Reorder the list
-    order = ['id', 'ctime', 'user', 'formula', 'config_type', 'calculator', 
-                'calculator_parameters', 'positions', 'energy', 'stress', 
-                'forces', 'pbc', 'numbers']
-    for key in reversed(order):
-        if key in keys_list:
-            keys_list.insert(0, keys_list.pop(keys_list.index(key)))
-
-    from prettytable import PrettyTable
-    t = PrettyTable([trim(key, 10) for key in keys_list])
-    t.padding_width = 0
-    for dct in table:
-        lst = []
-        for key in keys_list:
-            if key in dct:
-                value = dct[key]
-                if key == 'ctime':
-                    value = time.strftime('%d/%m/%y %H:%M:%S', time.localtime(value*YEAR+T2000))
-                value = trim(str(value), 10)
+        def trim(str, length):
+            if len(str) > length:
+                return (str[:length] + '..')
             else:
-                value = '-'
-            lst.append(value)
-        t.add_row(lst)
-    return t.get_string()
+                return str
+
+        def process_value(key, value):
+            if key == 'ctime':
+                value = time.strftime('%d/%m/%y %H:%M:%S', 
+                        time.localtime(value*YEAR+T2000))
+            return trim(str(value), 10)
+
+        keys_list = self.keys_union()
+
+        # Reorder the list
+        order = ['id', 'ctime', 'user', 'formula', 'config_type', 'calculator', 
+                    'calculator_parameters', 'positions', 'energy', 'stress', 
+                    'forces', 'pbc', 'numbers']
+        for key in reversed(order):
+            if key in keys_list:
+                keys_list.insert(0, keys_list.pop(keys_list.index(key)))
+
+        from prettytable import PrettyTable
+        t = PrettyTable([trim(key, 10) for key in keys_list])
+        t.padding_width = 0
+        for dct in self.dicts:
+            lst = []
+            for key in keys_list:
+                if key in dct:
+                    value = process_value(key, dct[key])       
+                else:
+                    value = '-'
+                lst.append(value)
+            t.add_row(lst)
+        return t.get_string()
+
+    def values_range(self, key):
+        values = []
+        for dct in self.dicts:
+            if key in dct:
+                values.append(dct[key])
+        if not values:
+            return None
+        elif len(values) == 1:
+            return (values[0])
+        else:
+            try:
+                ret = (min(values), max(values))
+            except:
+                ret = '? ({})'.format(values[0].__class__)
+            return ret
+
+    def keys_union(self):
+        keys = set()
+        for dct in self.dicts:
+            for key in dct:
+                keys.add(key)
+        return list(keys)
+
+    def keys_intersection(self):
+        if self.dicts:
+            keys = set(list(self.dicts[0].keys()))
+        else:
+            return set()
+        for dct in self.dicts[1:]:
+            new_keys = set()
+            for key in dct:
+                new_keys.add(key)
+            keys = keys & new_keys
+        return list(keys)
