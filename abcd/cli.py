@@ -334,20 +334,7 @@ def run(args, verbosity):
             atoms_it = box.find(auth_token=token, filter=query, 
                                 sort=args.sort, limit=args.limit)
             table = Table(atoms_it)
-            union = table.keys_union()
-            intersection = table.keys_intersection()
-
-            ranges = {}
-            for key in union:
-                ranges[key] = table.values_range(key)
-
-            print('Union of keys:')
-            for key in union:
-                print('    {}: {}'.format(key, ranges[key]))
-
-            print('Intersection of keys:')
-            for key in intersection:
-                print('    {}: {}'.format(key, ranges[key]))
+            table.print_keys_table()
            
         # If there was a query, print number of configurations found
         # If there was no query, print the whole database

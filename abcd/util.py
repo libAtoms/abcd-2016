@@ -3,6 +3,7 @@ __author__ = 'Martin Uhrin'
 import random
 from ase.utils import hill
 import time
+from prettytable import PrettyTable
 
 T2000 = 946681200.0  # January 1. 2000
 YEAR = 31557600.0  # 365.25 days
@@ -79,19 +80,18 @@ class Table:
             new_dict['formula'] = (hill(atoms.numbers))
             self.dicts.append(new_dict)
 
+    def _trim(self, str, length):
+        if len(str) > length:
+            return (str[:length] + '..')
+        else:
+            return str
+
     def __str__(self):
-
-        def trim(str, length):
-            if len(str) > length:
-                return (str[:length] + '..')
-            else:
-                return str
-
         def process_value(key, value):
             if key == 'ctime':
                 value = time.strftime('%d/%m/%y %H:%M:%S', 
                         time.localtime(value*YEAR+T2000))
-            return trim(str(value), 10)
+            return self._trim(str(value), 10)
 
         keys_list = self.keys_union()
 
@@ -103,8 +103,7 @@ class Table:
             if key in keys_list:
                 keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
-        from prettytable import PrettyTable
-        t = PrettyTable([trim(key, 10) for key in keys_list])
+        t = PrettyTable([self._trim(key, 10) for key in keys_list])
         t.padding_width = 0
         for dct in self.dicts:
             lst = []
@@ -130,7 +129,7 @@ class Table:
             try:
                 ret = (min(values), max(values))
             except:
-                ret = '? ({})'.format(values[0].__class__)
+                ret = ('?', '?')
             return ret
 
     def keys_union(self):
@@ -151,3 +150,24 @@ class Table:
                 new_keys.add(key)
             keys = keys & new_keys
         return list(keys)
+
+    def print_keys_table(self):
+        union = self.keys_union()
+        intersection = self.keys_intersection()
+        ranges = {key: self.values_range(key) for key in union}
+
+        t = PrettyTable(['Key', 'Min', 'Max'])
+        t.padding_width = 0
+        t.align["Key"] = "l"
+
+        print '\nUNION:'
+        for key in union:
+            row = [key, ranges[key][0], ranges[key][1]]
+            t.add_row([self._trim(str(el), 15) for el in row])
+        print t
+
+        print '\nINTERSECTION:'
+        for key in intersection:
+            row = [key, ranges[key][0], ranges[key][1]]
+            t.add_row([self._trim(str(el), 15) for el in row])
+        print t
