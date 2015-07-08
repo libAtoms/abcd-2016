@@ -52,6 +52,7 @@ class ASEdbSQlite3Backend(Backend):
 
         # Try to connect to the database if it was supplied as an argument
         if database:
+            database = os.path.basename(database)
             if not self.connect_to_database(database):
                 raise Exception('{} does not exist'.format(database))
 
@@ -76,6 +77,12 @@ class ASEdbSQlite3Backend(Backend):
             dbs_path = parser.get('ase-db', 'dbs_path')
         return dbs_path
 
+    def _translate_query(dct_query):
+        query = []
+        for key, value in dct_query.iteritems():
+            query.append('{}={}'.format(key, value))
+        return ','.join(query)
+
     def authenticate(self, credentials):
         return credentials.username
 
@@ -85,9 +92,7 @@ class ASEdbSQlite3Backend(Backend):
         If it doesn't exist, a new database is created,
         but this is only possible for the local user.
         '''
-        database = os.path.basename(database)
         file_path = os.path.join(self.root_dir, database)
-
         if not os.path.exists(file_path) and self.user:
             return False
         self.connection = connect(file_path)
