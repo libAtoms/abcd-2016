@@ -75,7 +75,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def find(self, auth_token, filter, sort, limit):
+    def find(self, auth_token, filter, sort, limit, keys, omit_keys):
         """
         Find entries that match the filter
 
@@ -85,6 +85,8 @@ class Backend(object):
         :param sort: Sort by
         :type sort: string?
         :param int limit: limit the number of returned entries
+        :param list keys: keys to be returned. '++' for all
+        :param list keys: keys to be omitted
         :return:
         :rtype: Iterator to the Aoms object
         """

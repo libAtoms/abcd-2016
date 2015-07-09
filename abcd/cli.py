@@ -30,14 +30,15 @@ if backend_enabled:
 description = ''
 
 examples = '''
-    abcd.py --remote abcd@gc121mac1 db1.db   (display the database)
-    abcd.py --remote abcd@gc121mac1 db1.db --keys   (display information about available keys)
+    abcd.py --remote abcd@gc121mac1 db1.db --show   (display the database)
+    abcd.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
     abcd.py --remote abcd@gc121mac1 db1.db \'energy<0.6,id>4\'   (querying)
     abcd.py --remote abcd@gc121mac1 db1.db --extract-original-file --target extracted   (extract files to the extracted/ folder)
     abcd.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
     abcd.py db1.db \'energy>0.7\' --count   (count number of selected rows)
     abcd.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
     abcd.py --add-from-file source.xyz db1.db   (add file to the database)
+    abcd.py db1.db --omit-keys 'user,id' --show  (omit keys)
 '''
 
 def main(args = sys.argv[1:]):
@@ -80,7 +81,9 @@ def main(args = sys.argv[1:]):
     add('--no-confirmation', action='store_true',
         help='Don\'t ask for confirmation')
     add('--target', default='.', help='Target directory for saving files')
-    add('--keys', action='store_true', help='Display information about available keys')
+    add('--keys', default='++', help='Select only specified keys')
+    add('--omit-keys', default='', help='Don\'t select these keys')
+    add('--show', action='store_true', help='Show the database')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -201,6 +204,13 @@ def run(args, verbosity):
         if query and query.isdigit():
             query = int(query)
 
+        # Decide which keys to show
+        if args.keys == '++':
+            keys = '++'
+        else:
+            keys = args.keys.split(',')
+        omit_keys = args.omit_keys.split(',')
+
         # Remove entries from a database
         if args.remove:
             if ssh:
@@ -214,7 +224,7 @@ def run(args, verbosity):
         # to the specified file.
         elif args.write_to_file:
             if ssh:
-                filename = '-'
+                filename = '-' # stdout
             else:
                 filename = args.write_to_file
 
@@ -225,10 +235,10 @@ def run(args, verbosity):
 
             nrows = 0
             list_of_atoms = []
+            omit = omit_keys + ['original_file_contents']
             for atoms in box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit):
-                if 'original_file_contents' in atoms.info:
-                    del atoms.info['original_file_contents']
+                                sort=args.sort, limit=args.limit,
+                                keys=keys, omit_keys=omit):
                 list_of_atoms.append(atoms)
                 nrows += 1
 
@@ -239,6 +249,7 @@ def run(args, verbosity):
                 if filename == '-':
                     if format is None: format = 'extxyz'
                     filename = sys.stdout
+                print(filename, format)
                 ase_write(filename, list_of_atoms, format=format)
             if not ssh:
                 out('Wrote %d rows.' % len(list_of_atoms))
@@ -257,7 +268,8 @@ def run(args, verbosity):
             nat = 0
             skipped_configs = []
             for atoms in box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit):
+                            sort=args.sort, limit=args.limit,
+                            keys=['original_file_contents', 'original_file_name']):
                 nat += 1
                 if ('original_file_name' not in atoms.info or
                     'original_file_contents' not in atoms.info):
@@ -332,7 +344,8 @@ def run(args, verbosity):
             else:
                 lim = args.limit + 1
             atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=lim)
+                                sort=args.sort, limit=lim,
+                                keys=keys, omit_keys=omit_keys)
             count = atoms_it.count()
             if args.limit != 0 and count > args.limit:
                 count = '{}+'.format(count-1)
@@ -340,19 +353,21 @@ def run(args, verbosity):
                 count = str(count)
             print('Found:', count)
 
-        elif args.keys:
+        # Show the database
+        elif args.show:
             atoms_it = box.find(auth_token=token, filter=query, 
-                                sort=args.sort, limit=args.limit)
-            table = Table(atoms_it)
-            table.print_keys_table()
-           
-        # If there was a query, print number of configurations found
-        # If there was no query, print the whole database
-        else:    
-            atoms_it = box.find(auth_token=token, filter=query, 
-                                sort=args.sort, limit=args.limit)
+                                sort=args.sort, limit=args.limit,
+                                keys=keys, omit_keys=omit_keys)
             table = Table(atoms_it)
             print(table)
+
+        # Print info about keys
+        else:
+            atoms_it = box.find(auth_token=token, filter=query, 
+                                sort=args.sort, limit=args.limit,
+                                keys=keys, omit_keys=omit_keys)
+            table = Table(atoms_it)
+            table.print_keys_table()
             
 main()
 

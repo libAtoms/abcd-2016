@@ -135,7 +135,7 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Deleted {}'.format(plural(len(ids), 'row'))
         return results.RemoveResult(removed_count=len(ids), msg=msg)
 
-    def find(self, auth_token, filter, sort, limit):
+    def find(self, auth_token, filter, sort, limit, keys, omit_keys):
         if not sort:
             sort = 'id'
         rows_iter = self.connection.select(filter, sort=sort, limit=limit)
@@ -145,8 +145,20 @@ class ASEdbSQlite3Backend(Backend):
             atoms.info['id'] = row.id
             atoms.info['user'] = row.user
             atoms.info['ctime'] = row.ctime
-            return atoms
 
+            keys_to_delete = []
+            if keys != '++':
+                for key in atoms.info:
+                    if key not in keys:
+                        keys_to_delete.append(key)
+
+            for key in omit_keys:
+                keys_to_delete.append(key)
+
+            for key in keys_to_delete:
+                atoms.info.pop(key, None)
+
+            return atoms
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
 
