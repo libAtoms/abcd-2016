@@ -30,15 +30,15 @@ if backend_enabled:
 description = ''
 
 examples = '''
-    abcd.py --remote abcd@gc121mac1 db1.db --show   (display the database)
-    abcd.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
-    abcd.py --remote abcd@gc121mac1 db1.db \'energy<0.6,id>4\'   (querying)
-    abcd.py --remote abcd@gc121mac1 db1.db --extract-original-file --target extracted   (extract files to the extracted/ folder)
-    abcd.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
-    abcd.py db1.db \'energy>0.7\' --count   (count number of selected rows)
-    abcd.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
-    abcd.py --add-from-file source.xyz db1.db   (add file to the database)
-    abcd.py db1.db --omit-keys 'user,id' --show  (omit keys)
+    cli.py --remote abcd@gc121mac1 db1.db --show   (display the database)
+    cli.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
+    cli.py --remote abcd@gc121mac1 db1.db \'energy<0.6,id>4\'   (querying)
+    cli.py --remote abcd@gc121mac1 db1.db --extract-original-file --target extracted   (extract files to the extracted/ folder)
+    cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
+    cli.py db1.db \'energy>0.7\' --count   (count number of selected rows)
+    cli.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
+    cli.py --add-from-file source.xyz db1.db   (add file to the database)
+    cli.py db1.db --omit-keys 'user,id' --show  (omit keys)
 '''
 
 def main(args = sys.argv[1:]):

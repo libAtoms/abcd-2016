@@ -13,7 +13,7 @@ setup(
     author='Martin Uhrin',
     author_email='martin.uhrin@epfl.ch',
     version='0.0.0',
-    install_requires=['ase'],
+    install_requires=['ase', 'prettytable', 'numpy'],
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 2.7",

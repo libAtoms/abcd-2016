@@ -157,8 +157,8 @@ class ASEdbSQlite3Backend(Backend):
 
             for key in keys_to_delete:
                 atoms.info.pop(key, None)
-
             return atoms
+
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
 
