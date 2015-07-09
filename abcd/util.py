@@ -86,11 +86,11 @@ class Table:
         else:
             return str
 
-    def _format_value(self, key, value):
+    def _format_value(self, key, value, max_len):
         if key == 'ctime':
             value = time.strftime('%d/%m/%y %H:%M:%S', 
                     time.localtime(value*YEAR+T2000))
-        return self._trim(str(value), 10)
+        return self._trim(str(value), max_len)
 
     def __str__(self):
         keys_list = self.keys_union()
@@ -109,7 +109,7 @@ class Table:
             lst = []
             for key in keys_list:
                 if key in dct:
-                    value = self._format_value(key, dct[key])
+                    value = self._format_value(key, dct[key], 10)
                 else:
                     value = '-'
                 lst.append(value)
@@ -162,8 +162,9 @@ class Table:
 
         print '\nINTERSECTION:'
         for key in intersection:
-            row = [key, ranges[key][0], ranges[key][1]]
-            t_intersection.add_row([self._trim(str(el), 15) for el in row])
+            row = [key, self._format_value(key, ranges[key][0], 18), 
+                        self._format_value(key, ranges[key][1], 18)]
+            t_intersection.add_row(row)
         print t_intersection
 
         t_union = PrettyTable(['Key', 'Min', 'Max'])
@@ -172,7 +173,7 @@ class Table:
 
         print '\nUNION:'
         for key in union:
-            row = [key, self._format_value(key, ranges[key][0]), 
-                        self._format_value(key, ranges[key][1])]
-            t_union.add_row([self._trim(str(el), 15) for el in row])
+            row = [key, self._format_value(key, ranges[key][0], 18), 
+                        self._format_value(key, ranges[key][1], 18)]
+            t_union.add_row(row)
         print t_union
