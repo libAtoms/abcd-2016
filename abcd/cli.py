@@ -8,10 +8,6 @@ import subprocess
 import tarfile
 import StringIO
 
-from authentication import Credentials
-from structurebox import StructureBox
-from util import atoms2dict, Table
-
 from ase.utils import plural
 from ase.io import read as ase_read
 from ase.io import write as ase_write
@@ -25,6 +21,11 @@ try:
     backend_enabled = True
 except ImportError:
     backend_enabled = False
+
+if backend_enabled:
+    from structurebox import StructureBox
+    from authentication import Credentials
+    from util import Table
 
 description = ''
 
