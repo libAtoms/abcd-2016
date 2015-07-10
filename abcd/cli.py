@@ -84,6 +84,7 @@ def main(args = sys.argv[1:]):
     add('--keys', default='++', help='Select only specified keys')
     add('--omit-keys', default='', help='Don\'t select these keys')
     add('--show', action='store_true', help='Show the database')
+    add('--store', metavar='DIR', help='Store a directory')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -205,6 +206,9 @@ def run(args, verbosity):
                 print(('Hello, {}. You don\'t have access to any databases.').format(user))
             return
 
+        if not args.database:
+            raise Exception('No database specified')
+
         # Get the query
         query = args.query
         if query and query.isdigit():
@@ -317,6 +321,51 @@ def run(args, verbosity):
                 tar.close()
             else:
                 out(msg)
+
+        elif args.store:
+            if ssh:
+                warning('Remote adding not yet supported')
+                return
+            if query:
+                warning('Ignoring query:', query)
+
+            rootdir = args.store
+            parsed = {}
+            aux_files = []
+            for root, subFolders, files in os.walk(rootdir):
+                for f in files:
+                    path = os.path.join(root, f)
+                    try:
+                        parsed[path] = ase_read(path)
+                    except IOError:
+                        aux_files.append(path)
+                    except:
+                        pass
+
+            if not parsed:
+                raise Exception('No parsable files found under {}'.format(rootdir))
+
+            for config_filename, atoms in parsed.iteritems():
+                exclude = parsed.keys()
+                def filter_function(tarinfo):
+                    if (tarinfo.name in exclude) and (tarinfo.name != config_filename):
+                        return None
+                    else:
+                        return tarinfo
+
+                c = StringIO.StringIO()
+                tar = tarfile.open(fileobj=c, mode='w')
+
+                config_name = os.path.basename(config_filename).split('.')[0]
+                arcname = rootdir + '-' + config_name
+                tar.add(name=rootdir, arcname=arcname, filter=filter_function)
+                tar.close()
+
+                atoms.info['original_file_name'] = arcname + '.tar'
+                atoms.arrays['original_file_contents'] = c.getvalue()
+
+                box.insert(token, atoms)
+                out('Added {0} and {1} auxilary files from {2}'.format(config_filename, len(aux_files), rootdir))
 
         # Add a configuration from a file to the specified database
         elif args.add_from_file:
