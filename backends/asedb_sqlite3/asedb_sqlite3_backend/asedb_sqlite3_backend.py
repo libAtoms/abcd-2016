@@ -31,11 +31,11 @@ class ASEdbSQlite3Backend(Backend):
     def require_database(func):
         '''When a function is decorated with this, an error will be thrown if 
             the connection to a database is not open.'''
-        def func_wrapper(self, *args, **kwargs):
-            if not self.connection:
+        def func_wrapper(*args, **kwargs):
+            if not args[0].connection:
                 raise Exception("No database is specified")
             else:
-                func(self, *args, **kwargs)
+                return func(*args, **kwargs)
         return func_wrapper
 
     def __init__(self, database=None, user=None, password=None):
@@ -153,6 +153,7 @@ class ASEdbSQlite3Backend(Backend):
     def find(self, auth_token, filter, sort, limit, keys, omit_keys):
         if not sort:
             sort = 'id'
+
         rows_iter = self.connection.select(filter, sort=sort, limit=limit)
 
         def row2atoms(row):
