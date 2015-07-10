@@ -336,11 +336,19 @@ def run(args, verbosity):
                 for f in files:
                     path = os.path.join(root, f)
                     try:
-                        parsed[path] = ase_read(path)
+                        atoms = ase_read(path)
                     except IOError:
                         aux_files.append(path)
+                        continue
                     except:
-                        pass
+                        # Sometimes ASE doesn't catch exceptions while reading
+                        # files and IOError is not raised.
+                        aux_files.append(path)
+                        continue
+
+                    if isinstance(atoms, list):
+                        raise RuntimeError('multi-config file formats not yet supported')
+                    parsed[path] = atoms
 
             if not parsed:
                 raise Exception('No parsable files found under {}'.format(rootdir))
