@@ -60,7 +60,7 @@ def atoms2dict(atoms, include_all_data=False):
 
     return dct
 
-class Table:
+class Table(object):
     '''
     Class that holds a list of dictionaries (created from the Atoms object).
     '''

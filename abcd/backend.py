@@ -17,6 +17,16 @@ class Backend(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
+    def list(self, auth_token):
+        """
+        List all the databases the user has access to
+
+        :param AuthToken auth_token: Authorisation token
+        :rtype: list
+        """
+        pass
+
+    @abstractmethod
     def authenticate(self, credentials):
         """
         Take a set of credentials and return an authorisation token or raise
@@ -50,6 +60,7 @@ class Backend(object):
         Take the atoms object and find an entry in the database with 
         the same unique id. If one exists, the old entry gets updated 
         with the new entry.
+
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable

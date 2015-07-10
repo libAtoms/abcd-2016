@@ -192,12 +192,18 @@ def run(args, verbosity):
 
         # List all available databases
         if args.list:
-            print(box.list_databases())
+            dbs = box.list(token)
+            if args.user:
+                user = args.user
+            else:
+                user = 'Local User'
+            if dbs:
+                print(('Hello, {}. Databases you have access to:').format(user))
+                for db in dbs:
+                    print('   {}'.format(db))
+            else:
+                print(('Hello, {}. You don\'t have access to any databases.').format(user))
             return
-
-        # Beyond this point a database has to be specified
-        if not args.database:
-            raise Exception('No database specified')
 
         # Get the query
         query = args.query

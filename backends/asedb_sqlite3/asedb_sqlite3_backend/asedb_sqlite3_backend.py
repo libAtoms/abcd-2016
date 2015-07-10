@@ -11,6 +11,7 @@ from ase.utils import plural
 from ase.atoms import Atoms
 
 from random import randint
+import glob
 
 class ASEdbSQlite3Backend(Backend):
 
@@ -27,10 +28,40 @@ class ASEdbSQlite3Backend(Backend):
                 n += 1
             return n
 
+    def require_database(func):
+        '''When a function is decorated with this, an error will be thrown if 
+            the connection to a database is not open.'''
+        def func_wrapper(self, *args, **kwargs):
+            if not self.connection:
+                raise Exception("No database is specified")
+            else:
+                func(self, *args, **kwargs)
+        return func_wrapper
+
     def __init__(self, database=None, user=None, password=None):
 
+        def get_dbs_path():
+            config_path = os.path.join(os.environ['HOME'], '.abcd_config')
+            dbs_path = None
+            parser = SafeConfigParser()
+
+            # Config file doesn't exist. Create it
+            if not os.path.isfile(config_path):
+                dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
+                cfg_file = open(config_path,'w')
+                parser.add_section('ase-db')
+                parser.set('ase-db', 'dbs_path', dbs_path)
+                parser.write(cfg_file)
+                cfg_file.close()
+            # Read the config file if it exists
+            else:
+                parser.read(config_path)
+                dbs_path = parser.get('ase-db', 'dbs_path')
+            return dbs_path
+
         self.user = user
-        self.dbs_path = self._get_dbs_path()
+        self.dbs_path = get_dbs_path()
+        self.connection = None
 
         # Check if the databases directory exists. If not , create it
         if not os.path.isdir(self.dbs_path):
@@ -60,30 +91,9 @@ class ASEdbSQlite3Backend(Backend):
 
         super(ASEdbSQlite3Backend, self).__init__()
 
-    def _get_dbs_path(self):
-        config_path = os.path.join(os.environ['HOME'], '.abcd_config')
-        dbs_path = None
-        parser = SafeConfigParser()
-
-        # Config file doesn't exist. Create it
-        if not os.path.isfile(config_path):
-            dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
-            cfg_file = open(config_path,'w')
-            parser.add_section('ase-db')
-            parser.set('ase-db', 'dbs_path', dbs_path)
-            parser.write(cfg_file)
-            cfg_file.close()
-        # Read the config file if it exists
-        else:
-            parser.read(config_path)
-            dbs_path = parser.get('ase-db', 'dbs_path')
-        return dbs_path
-
-    def _translate_query(dct_query):
-        query = []
-        for key, value in dct_query.iteritems():
-            query.append('{}={}'.format(key, value))
-        return ','.join(query)
+    def list(self, auth_token):
+        dbs = glob.glob(os.path.join(self.root_dir, '*.db'))
+        return [os.path.basename(db) for db in dbs]
 
     def authenticate(self, credentials):
         return credentials.username
@@ -100,26 +110,30 @@ class ASEdbSQlite3Backend(Backend):
         self.connection = connect(file_path)
         return True
 
-    def _insert_atoms(self, atoms):
-        atoms.info.pop('id', None)
-        if not 'unique_id' in atoms.info:
-            atoms.info['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
-        return self.connection.write(atoms=atoms, add_from_info_and_arrays=True)
-
+    @require_database
     def insert(self, auth_token, atoms):
+
+        def insert_atoms(atoms):
+            atoms.info.pop('id', None)
+            if not 'unique_id' in atoms.info:
+                atoms.info['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
+            return self.connection.write(atoms=atoms, add_from_info_and_arrays=True)
+
         ids = []
         if isinstance(atoms, Atoms):
-            ids.append(self._insert_atoms(atoms))
+            ids.append(self.insert_atoms(atoms))
         else:
             # Assume it's an iterator
             for ats in atoms:
-                ids.append(self._insert_atoms(atoms))
+                ids.append(self.insert_atoms(atoms))
         msg = 'Inserted {} configurations'.format(len(ids))
         return results.InsertResult(inserted_ids=ids, msg=msg)
 
+    @require_database
     def update(self, auth_token, atoms):
         pass
 
+    @require_database
     def remove(self, auth_token, filter, just_one, confirm):
         if just_one:
             limit = 1
@@ -135,6 +149,7 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Deleted {}'.format(plural(len(ids), 'row'))
         return results.RemoveResult(removed_count=len(ids), msg=msg)
 
+    @require_database
     def find(self, auth_token, filter, sort, limit, keys, omit_keys):
         if not sort:
             sort = 'id'

@@ -24,6 +24,10 @@ class StructureBox(object):
     def __init__(self, backend):
         self.backend = backend
 
+    def list(self, auth_token):
+        with StructureBox.BackendOpen(self.backend):
+            return self.backend.list(auth_token)
+
     def authenticate(self, credentials):
         with StructureBox.BackendOpen(self.backend):
             return self.backend.authenticate(credentials)
