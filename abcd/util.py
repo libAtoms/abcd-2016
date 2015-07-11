@@ -123,8 +123,6 @@ class Table(object):
                 values.append(dct[key])
         if not values:
             return None
-        elif len(values) == 1:
-            return (values[0])
         else:
             try:
                 ret = (min(values), max(values))
