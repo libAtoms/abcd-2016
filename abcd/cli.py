@@ -330,13 +330,13 @@ def run(args, verbosity):
                 warning('Ignoring query:', query)
 
             rootdir = args.store
-            parsed = {}
+            parsed = []
             aux_files = []
             for root, subFolders, files in os.walk(rootdir):
                 for f in files:
                     path = os.path.join(root, f)
                     try:
-                        atoms = ase_read(path)
+                        atoms = ase_read(path, index=slice(0, None, 1))
                     except IOError:
                         aux_files.append(path)
                         continue
@@ -346,34 +346,43 @@ def run(args, verbosity):
                         aux_files.append(path)
                         continue
 
-                    if isinstance(atoms, list):
-                        raise RuntimeError('multi-config file formats not yet supported')
-                    parsed[path] = atoms
+                    if len(atoms) > 1:
+                        for at in atoms:
+                            parsed.append((path, at, False))
+                    else:
+                        parsed.append((path, atoms[0], True))
 
             if not parsed:
                 raise Exception('No parsable files found under {}'.format(rootdir))
 
-            for config_filename, atoms in parsed.iteritems():
-                exclude = parsed.keys()
-                def filter_function(tarinfo):
-                    if (tarinfo.name in exclude) and (tarinfo.name != config_filename):
-                        return None
+            for config_filename, atoms, attach in parsed:
+
+                exclude = [tup[0] for tup in parsed]
+                if attach:
+                    exclude.remove(config_filename)
+
+                def exclude_fn(name):
+                    if name in exclude:
+                        return True
                     else:
-                        return tarinfo
+                        return False
 
                 c = StringIO.StringIO()
                 tar = tarfile.open(fileobj=c, mode='w')
 
                 config_name = os.path.basename(config_filename).split('.')[0]
                 arcname = rootdir + '-' + config_name
-                tar.add(name=rootdir, arcname=arcname, filter=filter_function)
+                tar.add(name=rootdir, arcname=arcname, exclude=exclude_fn)
                 tar.close()
 
                 atoms.info['original_file_name'] = arcname + '.tar'
                 atoms.arrays['original_file_contents'] = c.getvalue()
 
                 box.insert(token, atoms)
-                out('Added {0} and {1} auxilary files from {2}'.format(config_filename, len(aux_files), rootdir))
+                if attach:
+                    out(' -> Added {} and {} auxilary files from {}'.format(config_filename, len(aux_files), rootdir))
+                else:
+                    out(' -> Added {} auxilary files from {} (not attaching {} - multiconfig file)'.format(len(aux_files), rootdir, config_filename))
 
         # Add a configuration from a file to the specified database
         elif args.add_from_file:
