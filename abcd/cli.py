@@ -94,7 +94,7 @@ def main(args = sys.argv[1:]):
         run(args, verbosity)
     except Exception as x:
         if verbosity < 2:
-            print('{0}: {1}'.format(x.__class__.__name__, x))
+            print('{0}: {1}'.format(x.__class__.__name__, x), file=sys.stderr)
             sys.exit(1)
         else:
             raise
@@ -106,20 +106,20 @@ def run(args, verbosity):
         if verbosity > 0:
             print(*args)
 
-    def warning(*objs):
-        '''Prints the warning to stderr'''
-        print(*objs, file=sys.stderr)
+    def to_stderr(*args):
+        '''Prints to stderr'''
+        print(*args, file=sys.stderr)
 
     # User specified the "user" argument, quit.
     if args.user and args.remote:
-        warning('Unknown option --user. Terminating')
+        to_stderr('Unknown option --user. Terminating')
         sys.exit()
 
     # Query to the remote server. Remove the --remote argumnet and 
     # send the commmand via ssh. Mode: remote
     elif not args.user and args.remote:
 
-        ssh_call = 'ssh {} '.format(args.remote)
+        ssh_call = 'ssh -T {} '.format(args.remote)
 
         # Remove the 'remote' argument
         for arg in ['--remote', '-remote', '--r', '-r']:
@@ -133,12 +133,11 @@ def run(args, verbosity):
 
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
-        
+        to_stderr(stderr)
+
         # An error occured at the remote end when running the command.
-        # Print stdout sa it might contain the error.
         if process.returncode:
-            warning('An error occured')
-            print(stdout)
+            return
 
         # Write the received string to a file
         elif args.write_to_file:
@@ -149,7 +148,6 @@ def run(args, verbosity):
         # Unpack the received tar
         elif args.extract_original_file:
             if stdout.isspace():
-                warning(stderr)
                 return
             s = StringIO.StringIO(stdout)
             try:
@@ -157,21 +155,13 @@ def run(args, verbosity):
                 no_files = len(tar.getmembers())
                 print('Writing {} files to {}/'.format(no_files, args.target))
                 tar.extractall(path=args.target)
-            except tarfile.ReadError:
-                warning('Received file could not be read')
-                return
-            except tarfile.ExtractError:
-                warning('Could not extract configurations')
-                return
-            except:
-                warning('A fatal error occured')
+            except Exception as e:
+                to_stderr(str(e))
                 return
             finally:
                 tar.close()
-                warning(stderr)
         else:
             print(stdout)
-            warning(stderr)
 
     else:
         # Detect if the script is running over ssh
@@ -181,15 +171,11 @@ def run(args, verbosity):
             ssh = True
 
         if not backend_enabled:
-            raise Exception('The backend could not be imported')
+            raise ImportEror('The backend could not be imported')
 
-        # Try to initialise the backend
-        try:
-            box = StructureBox(ASEdbSQlite3Backend(database=args.database, user=args.user))
-            token = box.authenticate(Credentials(args.user))
-        except Exception as e:
-            print('An error occured: ', str(e))
-            return
+        # Initialise the backend
+        box = StructureBox(ASEdbSQlite3Backend(database=args.database, user=args.user))
+        token = box.authenticate(Credentials(args.user))
 
         # List all available databases
         if args.list:
@@ -207,7 +193,7 @@ def run(args, verbosity):
             return
 
         if not args.database:
-            raise Exception('No database specified')
+            raise RuntimeError('No database specified')
 
         # Get the query
         query = args.query
@@ -224,7 +210,7 @@ def run(args, verbosity):
         # Remove entries from a database
         if args.remove:
             if ssh:
-                warning('Remote removing not yet supported')
+                to_stder('Remote removing not yet supported')
                 return
             result = box.remove(token, query, just_one=False, 
                                 confirm=not args.no_confirmation)
@@ -317,17 +303,17 @@ def run(args, verbosity):
 
             if ssh:
                 print(c.getvalue())
-                warning(msg)
+                to_stderr(msg)
                 tar.close()
             else:
                 out(msg)
 
         elif args.store:
             if ssh:
-                warning('Remote adding not yet supported')
+                to_stderr('Remote adding not yet supported')
                 return
             if query:
-                warning('Ignoring query:', query)
+                to_stderr('Ignoring query:', query)
 
             rootdir = args.store
             parsed = []
@@ -387,10 +373,10 @@ def run(args, verbosity):
         # Add a configuration from a file to the specified database
         elif args.add_from_file:
             if ssh:
-                warning('Remote adding not yet supported')
+                to_stderr('Remote adding not yet supported')
                 return
             if query:
-                warning('Ignoring query:', query)
+                to_stderr('Ignoring query:', query)
 
             filename = args.add_from_file
             if ':' in filename:
