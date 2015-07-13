@@ -133,7 +133,8 @@ def run(args, verbosity):
 
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
-        to_stderr(stderr)
+        if not stderr.isspace():
+            to_stderr(stderr)
 
         # An error occured at the remote end when running the command.
         if process.returncode:
