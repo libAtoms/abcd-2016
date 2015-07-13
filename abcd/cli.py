@@ -104,11 +104,11 @@ def run(args, verbosity):
     def out(*args):
         '''Prints information in accordance to verbosity'''
         if verbosity > 0:
-            print(*args)
+            print(*(arg.rstrip('\n') for arg in args))
 
     def to_stderr(*args):
         '''Prints to stderr'''
-        print(*args, file=sys.stderr)
+        print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
 
     # User specified the "user" argument, quit.
     if args.user and args.remote:
