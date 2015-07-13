@@ -122,7 +122,23 @@ def run(args, verbosity):
     # send the commmand via ssh. Mode: remote
     elif not args.user and args.remote:
 
-        ssh_call = 'ssh -T {} '.format(args.remote)
+        # When we want to get data from remote and write it to file,
+        # we want to store stdout and stderr in variables, so -T flag
+        # has to be specified to the ssh command to turn off tty allocation.
+        # However, when doing all other things, we want the stdout to
+        # be printed to the screen (hence -t flag that enables tty).
+        if args.write_to_file or args.extract_original_file:
+            tty = False
+            tty_flag = '-T'
+            stdout=subprocess.PIPE
+            stderr=subprocess.PIPE
+        else:
+            tty = True
+            tty_flag = '-t'
+            stdout = None
+            stderr = None
+
+        ssh_call = 'ssh -q {} {} '.format(tty_flag, args.remote)
 
         # Remove the 'remote' argument
         for arg in ['--remote', '-remote', '--r', '-r']:
@@ -134,13 +150,13 @@ def run(args, verbosity):
         arguments = '\' {}\''.format(arguments)
         command = ssh_call + arguments
 
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(command, shell=True, stdout=stdout, stderr=stderr)
         stdout, stderr = process.communicate()
-        if not stderr.isspace():
+
+        if stderr and not stderr.isspace():
             to_stderr(stderr)
 
-        # An error occured at the remote end when running the command.
-        if process.returncode:
+        if process.returncode or tty:
             return
 
         # Write the received string to a file
@@ -226,9 +242,6 @@ def run(args, verbosity):
 
         # Remove entries from a database
         if args.remove:
-            if ssh:
-                to_stder('Remote removing not yet supported')
-                return
             result = box.remove(token, query, just_one=False, 
                                 confirm=not args.no_confirmation)
             print(result.msg)
@@ -413,16 +426,10 @@ def run(args, verbosity):
             out('Added {0} from {1}'.format(atoms.get_chemical_formula(), filename))
 
         elif args.add_kvp:
-            if ssh:
-                to_stderr('Remote kvp adding not yet supported')
-                return
             result = box.add_kvp(token, query, kvp)
             print(result.msg)
 
         elif args.remove_keys:
-            if ssh:
-                to_stderr('Remote keys removing not yet supported')
-                return
             result = box.remove_keys(token, query, remove_keys)
             print(result.msg)
 
