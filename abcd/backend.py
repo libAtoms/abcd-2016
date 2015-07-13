@@ -40,7 +40,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def insert(self, auth_token, atoms):
+    def insert(self, auth_token, atoms, kvp):
         """
         Take the Atoms object or an iterable to the Atoms and insert it
         to the database
@@ -48,6 +48,7 @@ class Backend(object):
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable
+        :param dict kvp: Key-value pairs to be added
         :return: Returns a result that holds a list of ids at which 
             the objects were inserted and a message
         :rtype: InsertResult
@@ -99,7 +100,33 @@ class Backend(object):
         :param list keys: keys to be returned. '++' for all
         :param list keys: keys to be omitted
         :return:
-        :rtype: Iterator to the Aoms object
+        :rtype: Iterator to the Atoms object
+        """
+        pass
+
+    @abstractmethod
+    def add_kvp(self, auth_token, filter, kvp):
+        """
+        Adds key-value pairs to the selectd configurations
+
+        :param AuthToken auth_token: Authorisation token
+        :param filter: Filter (in MongoDB query language)
+        :type filter: dictionary?
+        :param dict kvp: Key-value pairs to be added
+        :rtype: AddKvpResult
+        """
+        pass
+
+    @abstractmethod
+    def remove_keys(self, auth_token, filter, keys):
+        """
+        Removes specified keys from selected configurations
+
+        :param AuthToken auth_token: Authorisation token
+        :param filter: Filter (in MongoDB query language)
+        :type filter: dictionary?
+        :param dict keys: Keys to be removed
+        :rtype: RemoveKeysResult
         """
         pass
 

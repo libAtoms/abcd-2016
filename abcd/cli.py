@@ -13,6 +13,7 @@ from ase.io import read as ase_read
 from ase.io import write as ase_write
 from ase.db.summary import Summary
 from ase.calculators.calculator import get_calculator
+from ase.db.core import convert_str_to_float_or_str
 
 # Try to import the interface. If it fails, the script only has limited
 # functionality (only remote querying without saving).
@@ -85,6 +86,8 @@ def main(args = sys.argv[1:]):
     add('--omit-keys', default='', help='Don\'t select these keys')
     add('--show', action='store_true', help='Show the database')
     add('--store', metavar='DIR', help='Store a directory')
+    add('--add-kvp', metavar='{K1=V1,...}', help='Add key-value pairs')
+    add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -207,6 +210,19 @@ def run(args, verbosity):
         else:
             keys = args.keys.split(',')
         omit_keys = args.omit_keys.split(',')
+
+        # Get kvp
+        kvp = {}
+        if args.add_kvp:
+            for pair in args.add_kvp.split(','):
+                k, v = pair.split('=')
+                kvp[k] = convert_str_to_float_or_str(v)
+
+        # Get keys to be removed
+        remove_keys = []
+        if args.remove_keys:
+            for key in args.remove_keys.split(','):
+                remove_keys.append(key)
 
         # Remove entries from a database
         if args.remove:
@@ -365,7 +381,7 @@ def run(args, verbosity):
                 atoms.info['original_file_name'] = arcname + '.tar'
                 atoms.arrays['original_file_contents'] = c.getvalue()
 
-                box.insert(token, atoms)
+                box.insert(token, atoms, kvp)
                 if attach:
                     out(' -> Added {} and {} auxilary files from {}'.format(config_filename, len(aux_files), rootdir))
                 else:
@@ -393,8 +409,22 @@ def run(args, verbosity):
             atoms.info['original_file_name'] = filename
             atoms.arrays['original_file_contents'] = original_file_contents
 
-            box.insert(token, atoms)
+            box.insert(token, atoms, kvp)
             out('Added {0} from {1}'.format(atoms.get_chemical_formula(), filename))
+
+        elif args.add_kvp:
+            if ssh:
+                to_stderr('Remote kvp adding not yet supported')
+                return
+            result = box.add_kvp(token, query, kvp)
+            print(result.msg)
+
+        elif args.remove_keys:
+            if ssh:
+                to_stderr('Remote keys removing not yet supported')
+                return
+            result = box.remove_keys(token, query, remove_keys)
+            print(result.msg)
 
         # Count selected configuration
         elif args.count:

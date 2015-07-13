@@ -37,9 +37,37 @@ class InsertResult(Result):
 
 class UpdateResult(Result):
     def __init__(self, updated_ids, msg=None):
-        self.updated_ids = updated_ids
+        self._updated_ids = updated_ids
         super(UpdateResult, self).__init__(msg)
 
     @property
     def updated_ids(self):
-        return self.updated_ids
+        return self._updated_ids
+
+class AddKvpResult(Result):
+    def __init__(self, modified_ids, no_of_kvp_added, msg=None):
+        self._modified_ids = modified_ids
+        self._no_of_kvp_added = no_of_kvp_added
+        super(AddKvpResult, self).__init__(msg)
+
+    @property
+    def modified_ids(self):
+        return self._modified_ids
+
+    @property
+    def no_of_kvp_added(self):
+        return self._no_of_kvp_added
+
+class RemoveKeysResult(Result):
+    def __init__(self, modified_ids, no_of_keys_removed, msg=None):
+        self._modified_ids = modified_ids
+        self._no_of_keys_removed = no_of_keys_removed
+        super(RemoveKeysResult, self).__init__(msg)
+
+    @property
+    def modified_ids(self):
+        return self._modified_ids
+
+    @property
+    def no_of_keys_removed(self):
+        return self._no_of_keys_removed

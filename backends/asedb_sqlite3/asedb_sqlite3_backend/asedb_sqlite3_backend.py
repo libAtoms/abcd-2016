@@ -111,13 +111,13 @@ class ASEdbSQlite3Backend(Backend):
         return True
 
     @require_database
-    def insert(self, auth_token, atoms):
+    def insert(self, auth_token, atoms, kvp):
 
         def insert_atoms(atoms):
             atoms.info.pop('id', None)
             if not 'unique_id' in atoms.info:
                 atoms.info['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
-            return self.connection.write(atoms=atoms, add_from_info_and_arrays=True)
+            return self.connection.write(atoms=atoms, key_value_pairs=kvp, add_from_info_and_arrays=True)
 
         ids = []
         if isinstance(atoms, Atoms):
@@ -131,7 +131,7 @@ class ASEdbSQlite3Backend(Backend):
 
     @require_database
     def update(self, auth_token, atoms):
-        pass
+        return results.UpdateResult(updated_ids=[], msg='')
 
     @require_database
     def remove(self, auth_token, filter, just_one, confirm):
@@ -177,6 +177,18 @@ class ASEdbSQlite3Backend(Backend):
 
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
+
+    def add_kvp(self, auth_token, filter, kvp):
+        ids = [dct['id'] for dct in self.connection.select(filter)]
+        n = self.connection.update(ids, [], **kvp)[0]
+        msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))
+        return results.AddKvpResult(modified_ids=[], no_of_kvp_added=n, msg=msg)
+
+    def remove_keys(self, auth_token, filter, keys):
+        ids = [dct['id'] for dct in self.connection.select(filter)]
+        n = self.connection.update(ids, keys)[1]
+        msg = 'Removed {} keys in total from {} configurations'.format(n, len(ids))
+        return results.RemoveKeysResult(modified_ids=ids, no_of_keys_removed=n, msg=msg)
 
     def open(self):
         pass
