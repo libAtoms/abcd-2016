@@ -170,6 +170,7 @@ def run(args, verbosity):
     # List all available databases
     if args.list and ssh and local:
         communicate_via_ssh(args.remote, sys.argv, tty=True)
+        return
 
     elif args.list:
         box, token = init_backend(args.database, args.user)
@@ -186,10 +187,6 @@ def run(args, verbosity):
         else:
             print(('Hello, {}. You don\'t have access to any databases.').format(user))
         return
-
-
-    if not args.database:
-        raise RuntimeError('No database specified')
 
     # Get the query
     query = args.query
@@ -507,6 +504,9 @@ def run(args, verbosity):
 
     elif ssh and local:
         communicate_via_ssh(args.remote, sys.argv, tty=True)
+
+    elif not args.database:
+        to_stderr('No database specified')
 
     # Print info about keys
     else:
