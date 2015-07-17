@@ -2,8 +2,8 @@
 
 ## Frontend
 
-* Remote store
-* remote delete
+* ~~Remote store~~
+* ~~remote delete~~
 * ~~store key=value pairs given on the command line~~ 
 * ~~--store should look for one or more files/directories and find all files that can successfully be parsed into configurations. for each file that yields a single configuration, store this file and all other files that cannot be parsed should be stored as "original files" using tar. for files that yield multiple configurations, DO NOT store the configuration file, print a warning about this, and store the non-parsable files as usual.~~ 
 * copy/move files from one database to another, including a new database

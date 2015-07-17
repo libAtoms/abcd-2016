@@ -14,6 +14,7 @@ from ase.io import write as ase_write
 from ase.db.summary import Summary
 from ase.calculators.calculator import get_calculator
 from ase.db.core import convert_str_to_float_or_str
+from ase.atoms import Atoms
 
 try:
     from asedb_sqlite3_backend.asedb_sqlite3_backend import ASEdbSQlite3Backend
@@ -25,7 +26,9 @@ except ImportError as e:
 if backend_enabled:
     from structurebox import StructureBox
     from authentication import Credentials
-    from util import Table
+    from util import Table, atoms2plaindict, plaindict2atoms
+    import json
+    from base64 import b64encode, b64decode
 
 description = ''
 
@@ -37,7 +40,8 @@ examples = '''
     cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
     cli.py db1.db \'energy>0.7\' --count   (count number of selected rows)
     cli.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
-    cli.py --add-from-file source.xyz db1.db   (add file to the database)
+    cli.py db1.db --store conf1.xyz conf2.xyz info.txt   (store original files in the database)
+    cli.py db1.db --store configs/   (store the whole directory in the database)
     cli.py db1.db --omit-keys 'user,id' --show  (omit keys)
 '''
 
@@ -74,8 +78,6 @@ def main(args = sys.argv[1:]):
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('--extract-original-file', action='store_true',
         help='Extract an original file stored with -o/--store-original-file')
-    add('--add-from-file', metavar='(type:)filename...',
-        help='Add results from file.')
     add('--count', action='store_true',
         help='Count number of selected rows.')
     add('--no-confirmation', action='store_true',
@@ -84,7 +86,7 @@ def main(args = sys.argv[1:]):
     add('--keys', default='++', help='Select only specified keys')
     add('--omit-keys', default='', help='Don\'t select these keys')
     add('--show', action='store_true', help='Show the database')
-    add('--store', metavar='DIR', help='Store a directory')
+    add('--store', metavar='', nargs='+', help='Store a directory')
     add('--add-kvp', metavar='{K1=V1,...}', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     args = parser.parse_args()
@@ -122,10 +124,10 @@ def communicate_via_ssh(host, sys_args, tty, data_out=None):
         stderr=subprocess.PIPE
 
     if data_out and not data_out.isspace():
-        ssh_call = 'echo \'{}\' | ssh -q {} {} '.format(data_out, tty_flag, host)
+        ssh_call = 'echo {} | ssh -q {} {} '.format(b64encode(data_out), tty_flag, host)
     else:
         ssh_call = 'ssh -q {} {} '.format(tty_flag, host)
-
+    
     # Remove the 'remote' argument
     for arg in ['--remote', '-remote', '--r', '-r']:
         while arg in sys_args:
@@ -272,7 +274,7 @@ def run(args, verbosity):
         if not ssh:
             out('Wrote %d rows.' % len(list_of_atoms))
 
-
+    # Receives the tar file and untars it
     elif args.extract_original_file and ssh and local:
         stdout, stderr, ret = communicate_via_ssh(args.remote, sys.argv, tty=False)
 
@@ -297,7 +299,6 @@ def run(args, verbosity):
     # to the directory specified by the --target argument 
     # (current directory by default).
     elif args.extract_original_file:
-
         box, token = init_backend(args.database, args.user)
 
         # If over ssh, create a tar file in memory
@@ -323,7 +324,7 @@ def run(args, verbosity):
 
             # Add the file to the tar file
             if ssh and not local:
-                filestring = StringIO.StringIO(atoms.info['original_file_contents'])
+                filestring = StringIO.StringIO(b64decode(atoms.info['original_file_contents']))
                 info = tarfile.TarInfo(name=original_file_name)
                 info.size = len(filestring.buf)
                 tar.addfile(tarinfo=info, fileobj=filestring)
@@ -339,7 +340,7 @@ def run(args, verbosity):
 
                 out('Writing %s' % new_path)            
                 with open(new_path, 'w') as original_file:
-                    original_file.write(atoms.info['original_file_contents'])
+                    original_file.write(b64decode(atoms.info['original_file_contents']))
             nwrite += 1
 
         msg = 'Extracted original output files for %d/%d selected configurations' % (nwrite, nat)
@@ -353,52 +354,122 @@ def run(args, verbosity):
         else:
             out(msg)
 
+    # Receive configurations via stdin and write it to the database
+    elif args.store and ssh and not local:
+        # Authenticate before unpickling received data
+        # (only trust known users)
+        box, token = init_backend(args.database, args.user)
+
+        data_in = json.loads(b64decode(sys.stdin.read()))
+
+        for dct in data_in[0]:
+            dct['atoms'] = plaindict2atoms(dct['atoms'])
+
+        parsed = data_in[0]
+        aux_files = data_in[1]
+
+        if not isinstance(parsed, list) or not parsed:
+            to_stderr('No atoms received')
+            return
+        
+        for dct in parsed:
+            box.insert(token, dct['atoms'], kvp)
+
+        out('  --> Added {} configuration(s) to {}'
+                .format(len(parsed), args.database))
+        if aux_files:
+            out('Auxilary files inclued with each configuration:')
+            for f in aux_files:
+                out('  ', f)
+
+        not_included = set([dct['config_path'] for dct in parsed if not dct['attach_original']])
+        if not_included:
+            out('The following original files were not included:')
+        for f in not_included:
+            out('  ', f)
+
     elif args.store:
-        '''if ssh:
-            data_in = sys.stdin
-            print('Received:')
-            for line in data_in:
-                print(line)
-            return'''
         if query:
             to_stderr('Ignoring query:', query)
 
-        if ssh or not local:
-            return
+        # Detect if the supplied arguments are directories or files
+        dirs = []
+        files = []
+        for arg in args.store:
+            if os.path.isdir(arg):
+                dirs.append(arg)
+            elif os.path.isfile(arg):
+                files.append(arg)
+            else:
+                raise Exception('{} does not exist'.format(arg))
+        dirs = list(set(dirs))
+        files = list(set(files))
 
-        box, token = init_backend(args.database, args.user)
+        if dirs and files:
+            raise Exception('Supplied arguments have to be either all directories or all files')
+        if len(dirs) > 1:
+            raise Exception('Storing multiple directories at the same time not yet supported')
 
-        rootdir = args.store
-        parsed = []
-        aux_files = []
-        for root, subFolders, files in os.walk(rootdir):
+        def add_atoms_to_list(config_path, directory, atoms, lst):
+            if len(atoms) > 1:
+                for at in atoms:
+                    lst.append({'config_path':config_path, 'directory':directory, 'atoms':at, 'attach_original':False})
+            else:
+                lst.append({'config_path':config_path, 'directory':directory, 'atoms':atoms[0], 'attach_original':True})
+
+        def process_dir():
+            direct = dirs[0]
+            parsed = []
+            aux_files = []
+            for root, subFolders, files in os.walk(direct):
+                for f in files:
+                    path = os.path.join(root, f)
+                    try:
+                        atoms = ase_read(path, index=slice(0, None, 1))
+                        add_atoms_to_list(path, direct, atoms, parsed)
+                    except:
+                        aux_files.append(path)
+            return parsed, aux_files
+
+        def process_files():
+            parsed = []
+            aux_files = []
             for f in files:
-                path = os.path.join(root, f)
                 try:
-                    atoms = ase_read(path, index=slice(0, None, 1))
-                except IOError:
-                    aux_files.append(path)
-                    continue
+                    atoms = ase_read(f, index=slice(0, None, 1))
+                    add_atoms_to_list(f, None, atoms, parsed)
                 except:
-                    # Sometimes ASE doesn't catch exceptions while reading
-                    # files and IOError is not raised.
-                    aux_files.append(path)
-                    continue
+                    aux_files.append(f)
+            return parsed, aux_files
 
-                if len(atoms) > 1:
-                    for at in atoms:
-                        parsed.append((path, at, False))
-                else:
-                    parsed.append((path, atoms[0], True))
+        if dirs:
+            parsed, aux_files = process_dir()
+        else:
+            parsed, aux_files = process_files()
 
         if not parsed:
-            raise Exception('No parsable files found under {}'.format(rootdir))
+            raise Exception('Could not find any parsable files')
 
-        for config_filename, atoms, attach in parsed:
+        def get_tarname(path, directory=None):
+            basename = os.path.basename(path)
+            if '.' in path:
+                name = basename.split('.')[0]
+            else:
+                name = basename
+            if directory:
+                name = directory + '-' + name
+            return name
 
-            exclude = [tup[0] for tup in parsed]
+        # Tar files together and attach the .tar to the
+        # corresponding Atoms object.
+        for dct in parsed:
+            path = dct['config_path']
+            directory = dct['directory']
+            attach = dct['attach_original']
+
+            exclude = set([d['config_path'] for d in parsed])
             if attach:
-                exclude.remove(config_filename)
+                exclude.remove(path)
 
             def exclude_fn(name):
                 if name in exclude:
@@ -409,49 +480,52 @@ def run(args, verbosity):
             c = StringIO.StringIO()
             tar = tarfile.open(fileobj=c, mode='w')
 
-            config_name = os.path.basename(config_filename).split('.')[0]
-            arcname = rootdir + '-' + config_name
-            tar.add(name=rootdir, arcname=arcname, exclude=exclude_fn)
-            tar.close()
-
-            atoms.info['original_file_name'] = arcname + '.tar'
-            atoms.arrays['original_file_contents'] = c.getvalue()
-
-            box.insert(token, atoms, kvp)
-            if attach:
-                out(' -> Added {} and {} auxilary files from {}'
-                    .format(config_filename, len(aux_files), rootdir))
+            arcname = get_tarname(path, directory)
+            tar_empty = False
+            if directory:
+                # Tar the directory
+                tar.add(name=directory, arcname=arcname, exclude=exclude_fn)
+                tar.close()
             else:
-                out(' -> Added {} auxilary files from {} (not attaching {} - multiconfig file)'
-                    .format(len(aux_files), rootdir, config_filename))
+                # Tar all the files together
+                for f in files:
+                    tar.add(name=f, exclude=exclude_fn)
+                if not tar.getmembers():
+                    tar_empty = True
+                tar.close()
 
-    # Add a configuration from a file to the specified database
-    elif args.add_from_file:
+            # Attach original file to the Atoms object
+            if not tar_empty:
+                dct['atoms'].info['original_file_name'] = arcname + '.tar'
+                dct['atoms'].arrays['original_file_contents'] = b64encode(c.getvalue())
 
-        if query:
-            to_stderr('Ignoring query:', query)
+        if ssh and local:
+            # Convert the atoms objects to dictionaries
+            data_out = [parsed, aux_files]
+            for dct in data_out[0]:
+                dct['atoms'] = atoms2plaindict(dct['atoms'])
 
-        if ssh or not local:
-            return
-
-        box, token = init_backend(args.database, args.user)
-
-        filename = args.add_from_file
-        if ':' in filename:
-            calculator_name, filename = filename.split(':')
-            atoms = get_calculator(calculator_name)(filename).get_atoms()
+            # Serialise the data and send it to remote
+            data_string = json.dumps(data_out)
+            communicate_via_ssh(args.remote, sys.argv, tty=True, data_out=data_string)
         else:
-            atoms = ase_read(filename)
-            if isinstance(atoms, list):
-                raise RuntimeError('multi-config file formats not yet supported')
+            # Write atoms to the database
+            box, token = init_backend(args.database, args.user)
+            atoms_list = [dct['atoms'] for dct in parsed]
+            box.insert(token, atoms_list, kvp)
 
-        with open(filename) as f:
-            original_file_contents = f.read()
-        atoms.info['original_file_name'] = filename
-        atoms.arrays['original_file_contents'] = original_file_contents
+            out('  --> Added {} configuration(s) to {}'
+                .format(len(parsed), args.database))
+            if aux_files:
+                out('Auxilary files inclued with each configuration:')
+                for f in aux_files:
+                    out('  ', f)
 
-        box.insert(token, atoms, kvp)
-        out('Added {0} from {1}'.format(atoms.get_chemical_formula(), filename))
+            not_included = set([dct['config_path'] for dct in parsed if not dct['attach_original']])
+            if not_included:
+                out('The following original files were not included:')
+            for f in not_included:
+                out('  ', f)
 
     elif args.add_kvp:
         if ssh and local:

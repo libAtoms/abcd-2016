@@ -16,7 +16,8 @@ To run the script locally a backend is needed, as well as the "prettytable" and 
 
 - ```cli.py db1.db 'energy>0.7' --count``` - count number of selected rows
 - ```cli.py db1.db 'energy>0.8' --remove --no-confirmation``` - remove selected configurations, don\'t ask for confirmation
-- ```cli.py --add-from-file source.xyz db1.db``` - add file to the database
+- ```cli.py db1.db --store conf1.xyz conf2.xyz info.txt``` - store original files in the database
+- ```cli.py db1.db --store configs/``` - store the whole directory in the database
 - ```cli.py db1.db --omit-keys 'user,id' --show``` - omit keys "user" and "id"
 
 ### Installing

@@ -123,9 +123,9 @@ class ASEdbSQlite3Backend(Backend):
         if isinstance(atoms, Atoms):
             ids.append(insert_atoms(atoms))
         else:
-            # Assume it's an iterator
+            # Assume it's an iterable
             for ats in atoms:
-                ids.append(insert_atoms(atoms))
+                ids.append(insert_atoms(ats))
         msg = 'Inserted {} configurations'.format(len(ids))
         return results.InsertResult(inserted_ids=ids, msg=msg)
 
