@@ -101,12 +101,9 @@ class ASEdbSQlite3Backend(Backend):
     def connect_to_database(self, database):
         '''
         Connects to the database if it exists.
-        If it doesn't exist, a new database is created,
-        but this is only possible for the local user.
+        If it doesn't exist, a new database is created.
         '''
         file_path = os.path.join(self.root_dir, database)
-        if not os.path.exists(file_path) and self.user:
-            return False
         self.connection = connect(file_path)
         return True
 

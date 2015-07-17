@@ -36,7 +36,7 @@ examples = '''
     cli.py --remote abcd@gc121mac1 db1.db --show   (display the database)
     cli.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
     cli.py --remote abcd@gc121mac1 db1.db \'energy<0.6,id>4\'   (querying)
-    cli.py --remote abcd@gc121mac1 db1.db --extract-original-file --target extracted   (extract files to the extracted/ folder)
+    cli.py --remote abcd@gc121mac1 db1.db --extract-files --target extracted/   (extract original files to the extracted/ folder)
     cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
     cli.py db1.db \'energy>0.7\' --count   (count number of selected rows)
     cli.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
@@ -59,36 +59,37 @@ def main(args = sys.argv[1:]):
         sys.exit(1)
 
     add = parser.add_argument
+    add('database', nargs='?', help = 'Specify the database')
+    add('query', nargs = '?', default = '', help = 'Query')
     add('--verbose', action='store_true', default=False)
     add('--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
     add('--user', help = argparse.SUPPRESS)
-    add('database', nargs='?', help = 'Specify the database')
-    add('query', nargs = '?', default = '', help = 'Query')
-    add('--remove', action='store_true',
-        help='Remove selected rows.')
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
+    add('--show', action='store_true', help='Show the database')
     add('--limit', type=int, default=500, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
     add('--sort', metavar='COL', default=None,
         help='Specify the column to sort the rows by')
-    add('--write-to-file', metavar='(type:)filename',
-        help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
-    add('--extract-original-file', action='store_true',
-        help='Extract an original file stored with -o/--store-original-file')
     add('--count', action='store_true',
         help='Count number of selected rows.')
-    add('--no-confirmation', action='store_true',
-        help='Don\'t ask for confirmation')
-    add('--target', default='.', help='Target directory for saving files')
     add('--keys', default='++', help='Select only specified keys')
     add('--omit-keys', default='', help='Don\'t select these keys')
-    add('--show', action='store_true', help='Show the database')
-    add('--store', metavar='', nargs='+', help='Store a directory')
     add('--add-kvp', metavar='{K1=V1,...}', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
+    add('--remove', action='store_true',
+        help='Remove selected rows.')
+    add('--no-confirmation', action='store_true',
+        help='Don\'t ask for confirmation')
+    add('--store', metavar='', nargs='+', help='Store a directory / list of files')
+    add('--extract-files', action='store_true',
+        help='Extract original files stored with --store')
+    add('--target', default='.', help='Target directory for extracted files')
+    add('--write-to-file', metavar='(type:)filename',
+        help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
+
     args = parser.parse_args()
 
     # Calculate the verbosity
@@ -275,7 +276,7 @@ def run(args, verbosity):
             out('Wrote %d rows.' % len(list_of_atoms))
 
     # Receives the tar file and untars it
-    elif args.extract_original_file and ssh and local:
+    elif args.extract_files and ssh and local:
         stdout, stderr, ret = communicate_via_ssh(args.remote, sys.argv, tty=False)
 
         if stderr and not stderr.isspace():
@@ -297,8 +298,9 @@ def run(args, verbosity):
 
     # Extract original file(s) from the database and write them
     # to the directory specified by the --target argument 
-    # (current directory by default).
-    elif args.extract_original_file:
+    # (current directory by default), or print the file
+    # to stdout.
+    elif args.extract_files:
         box, token = init_backend(args.database, args.user)
 
         # If over ssh, create a tar file in memory
@@ -306,41 +308,54 @@ def run(args, verbosity):
             c = StringIO.StringIO()
             tar = tarfile.open(fileobj=c, mode='w')
 
-        nwrite = 0
+        # Extract original file contents from the atoms
+        names = []
+        unique_ids = []
+        original_files =[]
         nat = 0
-        skipped_configs = []
         for atoms in box.find(auth_token=token, filter=query, 
                         sort=args.sort, limit=args.limit,
-                        keys=['original_file_contents', 'original_file_name']):
+                        keys=['original_file_contents', 'unique_id']):
             nat += 1
-            if ('original_file_name' not in atoms.info or
-                'original_file_contents' not in atoms.info):
+            if 'original_file_contents' not in atoms.info:
                 skipped_configs.append(nat)
                 continue
-            
-            original_file_name = atoms.info['original_file_name']
-            # Restore to current working directory
-            original_file_name = os.path.basename(original_file_name)
+            name = atoms.get_chemical_formula()
+            if len(name) > 10:
+                name = str[:10]
+            names.append(name)
+            unique_ids.append(atoms.info['unique_id'])
+            original_files.append(atoms.info['original_file_contents'])
 
-            # Add the file to the tar file
+        # Mangle the names
+        for name in names:
+            indices = [i for i, s in enumerate(names) if s == name]
+            if len(indices) > 1:
+                for i in indices:
+                    names[i] += '-' + unique_ids[i][-15:]
+        
+        nwrite = 0
+        skipped_configs = []
+        for i in range(len(names)):
+            # Add the file to the tar file which will
+            # be printed to stdout.
             if ssh and not local:
-                filestring = StringIO.StringIO(b64decode(atoms.info['original_file_contents']))
-                info = tarfile.TarInfo(name=original_file_name)
+                filestring = StringIO.StringIO(b64decode(original_files[i]))
+                info = tarfile.TarInfo(name=names[i]+'.tar')
                 info.size = len(filestring.buf)
                 tar.addfile(tarinfo=info, fileobj=filestring)
             # Write the file locally
             else:
-                new_path = os.path.join(args.target, original_file_name)
+                path = os.path.join(args.target, names[i]+'.tar')
 
-                if not os.path.exists(os.path.dirname(new_path)):
-                    os.makedirs(os.path.dirname(new_path))
-                elif os.path.exists(new_path):
-                    print('{} already exists, skipping write.'.format(new_path))
-                    continue
+                if not os.path.exists(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                elif os.path.exists(path):
+                    print('{} already exists. Skipping write'.format(path))
 
-                out('Writing %s' % new_path)            
-                with open(new_path, 'w') as original_file:
-                    original_file.write(b64decode(atoms.info['original_file_contents']))
+                out('Writing %s' % path)            
+                with open(path, 'w') as original_file:
+                    original_file.write(b64decode(original_files[i]))
             nwrite += 1
 
         msg = 'Extracted original output files for %d/%d selected configurations' % (nwrite, nat)
@@ -450,16 +465,6 @@ def run(args, verbosity):
         if not parsed:
             raise Exception('Could not find any parsable files')
 
-        def get_tarname(path, directory=None):
-            basename = os.path.basename(path)
-            if '.' in path:
-                name = basename.split('.')[0]
-            else:
-                name = basename
-            if directory:
-                name = directory + '-' + name
-            return name
-
         # Tar files together and attach the .tar to the
         # corresponding Atoms object.
         for dct in parsed:
@@ -480,11 +485,10 @@ def run(args, verbosity):
             c = StringIO.StringIO()
             tar = tarfile.open(fileobj=c, mode='w')
 
-            arcname = get_tarname(path, directory)
             tar_empty = False
             if directory:
                 # Tar the directory
-                tar.add(name=directory, arcname=arcname, exclude=exclude_fn)
+                tar.add(name=directory, exclude=exclude_fn)
                 tar.close()
             else:
                 # Tar all the files together
@@ -496,7 +500,6 @@ def run(args, verbosity):
 
             # Attach original file to the Atoms object
             if not tar_empty:
-                dct['atoms'].info['original_file_name'] = arcname + '.tar'
                 dct['atoms'].arrays['original_file_contents'] = b64encode(c.getvalue())
 
         if ssh and local:
@@ -588,6 +591,8 @@ def run(args, verbosity):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, limit=args.limit,
                             keys=keys, omit_keys=omit_keys)
+        print(atoms_it.next().info['unique_id'])
+        sys.exit()
         table = Table(atoms_it)
         table.print_keys_table()
             
