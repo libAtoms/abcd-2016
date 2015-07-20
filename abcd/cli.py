@@ -641,8 +641,7 @@ def run(args, verbosity):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, limit=args.limit,
                             keys=keys, omit_keys=omit_keys)
-        print(atoms_it.next().info['unique_id'])
-        sys.exit()
+
         table = Table(atoms_it)
         table.print_keys_table()
             
