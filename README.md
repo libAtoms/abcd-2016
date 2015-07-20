@@ -30,7 +30,7 @@ No install is needed when the script is to be run only remotely. To use it local
 
 ### Allowing access to your databases from the outside
 You will need a separate user on your Unix machine (say, "abcd"). In the ```~/.ssh/authorized_keys``` file you should put a public key of a person you want to grant access to. Each line should be in the following format:
->command="path/to/cli.py ${SSH\_ORIGINAL\_COMMAND} --user USER" ssh-rsa AAAAB3NzaC1y...QoJjD3eACfT user@email.com  
+>command="path/to/cli.py ${SSH\_ORIGINAL\_COMMAND} --ssh --user USER" ssh-rsa AAAAB3NzaC1y...QoJjD3eACfT user@email.com  
 
 Where path/to/cli.py should be substituted for the path to the cli.py script, and user for the name of the owner of the key. Each time this key is used to log into this computer, the script abcd.py is executed with user-specified arguments, and also an additional argument: --user USER.
 

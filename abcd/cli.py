@@ -65,6 +65,7 @@ def main(args = sys.argv[1:]):
     add('--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
     add('--user', help = argparse.SUPPRESS)
+    add('--ssh', action='store_true', default=False, help=argparse.SUPPRESS)
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
     add('--show', action='store_true', help='Show the database')
@@ -91,7 +92,7 @@ def main(args = sys.argv[1:]):
     add('--target', default='.', help='Target directory for extracted files')
     add('--write-to-file', metavar='(type:)filename',
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
-    add('--ids', action='store_true')
+    add('--ids', action='store_true', help='Print unique ids of selected configurations')
 
     args = parser.parse_args()
 
@@ -175,18 +176,15 @@ def run(args, verbosity):
             print(*(arg.rstrip('\n') for arg in args))
 
     # Detect if the script is running over ssh
-    if not args.user and not args.remote:
-        ssh = False
-        local = True
-    elif not args.user and args.remote:
-        ssh = True
-        local = True
-    elif args.user and not args.remote:
-        ssh = True
+    if args.ssh:
         local = False
+        ssh = True
     else:
-        raise RuntimeError('Unknown option --user. Terminating')
-        sys.exit()
+        local = True
+        if args.remote:
+            ssh = True
+        else:
+            ssh = False
 
     # List all available databases
     if args.list and ssh and local:
