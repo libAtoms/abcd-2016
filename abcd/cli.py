@@ -86,9 +86,12 @@ def main(args = sys.argv[1:]):
     add('--store', metavar='', nargs='+', help='Store a directory / list of files')
     add('--extract-files', action='store_true',
         help='Extract original files stored with --store')
+    add('--untar', action='store_true', default=False,
+        help='Automaticall untar files extracted with --extract-files')
     add('--target', default='.', help='Target directory for extracted files')
     add('--write-to-file', metavar='(type:)filename',
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
+    add('--ids', action='store_true')
 
     args = parser.parse_args()
 
@@ -144,17 +147,32 @@ def communicate_via_ssh(host, sys_args, tty, data_out=None):
 
     return stdout, stderr, process.returncode
 
+def to_stderr(*args):
+    '''Prints to stderr'''
+    if args and any(not arg.isspace() for arg in args):
+        print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
+
+def untar_file(fileobj, target, quiet=False):
+    try:
+        tar = tarfile.open(fileobj=fileobj, mode='r')
+        members = tar.getmembers()
+        no_files = len(members)
+        if not quiet:
+            print('  -> Writing {} files to {}/'.format(no_files, target))
+        tar.extractall(path=target)
+        return [os.path.join(target, m.name) for m in members]
+    except Exception as e:
+        to_stderr(str(e))
+        return None
+    finally:
+        tar.close()
+
 def run(args, verbosity):
 
     def out(*args):
         '''Prints information in accordance to verbosity'''
         if verbosity > 0:
             print(*(arg.rstrip('\n') for arg in args))
-
-    def to_stderr(*args):
-        '''Prints to stderr'''
-        if args and any(not arg.isspace() for arg in args):
-            print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
 
     # Detect if the script is running over ssh
     if not args.user and not args.remote:
@@ -235,25 +253,25 @@ def run(args, verbosity):
         if ret or stdout.isspace():
             return
 
-        # Write the received string to a file
-        filename = args.write_to_file
-        with open(filename, 'w') as f:
-            f.write(stdout)
+        s = StringIO.StringIO(stdout)
+        untar_file(s, args.target)
 
     # Extract a configuration from the database and write it
     # to the specified file.
     elif args.write_to_file:
         box, token = init_backend(args.database, args.user)
 
-        if ssh and not local:
-            filename = '-' # stdout
-        elif not ssh and local:
-            filename = args.write_to_file
-        
+        filename = args.write_to_file
         if '.' in filename:
-            format = filename.split('.')[1]
+            filename, format = filename.split('.')
         else:
-            format = None
+            format = 'extxyz'
+        if format == 'xyz':
+            format = 'extxyz'
+
+        if ssh and not local:
+            tarstring = StringIO.StringIO()
+            tar = tarfile.open(fileobj=tarstring, mode='w')
 
         nrows = 0
         list_of_atoms = []
@@ -264,16 +282,43 @@ def run(args, verbosity):
             list_of_atoms.append(atoms)
             nrows += 1
 
-        if '%' in filename:
-            for i, atoms in enumerate(list_of_atoms):
-                ase_write(filename % i, atoms, format=format)
+        if not list_of_atoms:
+            to_stderr('No atoms selected')
+            return
+
+        if '%' not in filename and len(list_of_atoms) != 1:
+            to_stderr('Please specify the name formatting')
+            return
+
+        for i, atoms in enumerate(list_of_atoms):
+            if '%' in filename:
+                name = filename % i + '.' + format
+            else:
+                name = filename + '.' + format
+
+            if ssh and not local:
+                # For some reason tarring oesn't work
+                # if temp_s is used directly in the
+                # tar.addfile function. For this reason 
+                # the contents of temp_s are transferred
+                # to s.
+                temp_s = StringIO.StringIO()
+                ase_write(temp_s, atoms, format=format)
+                s = StringIO.StringIO(temp_s.getvalue())
+                temp_s.close()
+
+                info = tarfile.TarInfo(name=name)
+                info.size = len(s.buf)
+                tar.addfile(tarinfo=info, fileobj=s)
+                s.close()
+            else:
+                ase_write(name, atoms, format=format)
+
+        if ssh and not local:
+            print(tarstring.getvalue())
+            tar.close()
         else:
-            if filename == '-':
-                if format is None: format = 'extxyz'
-                filename = sys.stdout
-            ase_write(filename, list_of_atoms, format=format)
-        if not ssh:
-            out('Wrote %d rows.' % len(list_of_atoms))
+            out('Wrote {} rows.'.format(len(list_of_atoms)))
 
     # Receives the tar file and untars it
     elif args.extract_files and ssh and local:
@@ -285,16 +330,13 @@ def run(args, verbosity):
             return
 
         s = StringIO.StringIO(stdout)
-        try:
-            tar = tarfile.open(fileobj=s, mode='r')
-            no_files = len(tar.getmembers())
-            print('Writing {} files to {}/'.format(no_files, args.target))
-            tar.extractall(path=args.target)
-        except Exception as e:
-            to_stderr(str(e))
-            return
-        finally:
-            tar.close()
+        members = untar_file(s, args.target, quiet=args.untar)
+
+        # Untar individual tarballs
+        if args.untar:
+            for tarball in members:
+                with open(tarball, 'r') as f:
+                    untar_file(f, args.target, quiet=False)
 
     # Extract original file(s) from the database and write them
     # to the directory specified by the --target argument 
@@ -351,9 +393,9 @@ def run(args, verbosity):
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
                 elif os.path.exists(path):
-                    print('{} already exists. Skipping write'.format(path))
+                    out('{} already exists. Skipping write'.format(path))
 
-                out('Writing %s' % path)            
+                out('  --> Writing {} files to {}/'.format(path, args.target))            
                 with open(path, 'w') as original_file:
                     original_file.write(b64decode(original_files[i]))
             nwrite += 1
@@ -584,6 +626,14 @@ def run(args, verbosity):
 
     elif not args.database:
         to_stderr('No database specified')
+
+    elif args.ids:
+        box, token = init_backend(args.database, args.user)
+        atoms_it = box.find(auth_token=token, filter=query, 
+                            sort=args.sort, limit=args.limit,
+                            keys=keys, omit_keys=omit_keys)
+        for atoms in atoms_it:
+            print(atoms.info['unique_id'])
 
     # Print info about keys
     else:
