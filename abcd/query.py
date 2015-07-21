@@ -2,22 +2,43 @@ __author__ = 'Patrick Szmucer'
 
 operators = ['=', '!=', '>', '>=', '<', '<=']
 
-class Condition:
-	def __init__(self, operator, operands):
+class LogicalList(object):
+	linking_operators = ['and', 'or']
+
+	def __init__(self, operator, lst):
+		if operator not in self.linking_operators:
+			raise RuntimeError('Unsupported operator {}'.format(operator))
+		self.linking_operator = operator
+		self.list = lst
+
+	def __str__(self):
+		return '{}{}'.format(self.linking_operator.upper(), self.list)
+
+def And(*args):
+	return LogicalList('and', args)
+
+def Or(*args):
+	return LogicalList('or', args)
+
+class Condition(object):
+	def __init__(self, key, operator, operand):
 		'''
+		:param key: LHS of the condition (key)
+		:type key: string
 		:param operator: operator
 		:type operator: string
-		:param operand: RHS of the operator
-		:type operand: string/number or list of strings/numbers
+		:param rhs: RHS of the operator
+		:type rhs: list of strings/numbers
 		'''
 		if operator in operators:
 			self.operator = operator
 		else:
 			raise RuntimeError('Unknown operator {}'.format(operator))
-		self.operands = operands
+		self.operand = operand
+		self.key = key
 
 	def __str__(self):
-		return '{} {}'.format(self.operator, self.operands)
+		return '{} {} {}'.format(self.key, self.operator, self.operand)
 
 class QueryTranslator(object):
 	def __init__(self, *args):
@@ -29,16 +50,13 @@ class QueryTranslator(object):
 	def translate(self):
 		'''
 		Translates from the CLI query language to
-		a dictonary of conditions.
+		a list of conditions.
 
-		:return: Returns a dicitonary of key-conditions,
-				where each condition specifies an operator
-				(equal, less than, etc.) and 
-				and operands.
-		:rtype: dictionary
+		:return: Returns a list of conditions
+		:rtype: list
 		'''
 		operators.sort(key=len, reverse=True)
-		query_dct = {}
+		conditions = []
 
 		def is_float(n):
 			try:
@@ -65,11 +83,12 @@ class QueryTranslator(object):
 					vals[i] = int(v)
 				elif is_float(v):
 					vals[i] = float(v)
-			c = Condition(op, vals)
-			if key in query_dct:
-				query_dct[key].append(c)
+			if operator == '!=':
+				Link = And
 			else:
-				query_dct[key] = [c]
+				Link = Or
+			c = Condition(key, op, Link(*vals))
+			conditions.append(c)
 
 		for query in self.queries:
 			for op in operators:
@@ -77,4 +96,4 @@ class QueryTranslator(object):
 					interpret(query, op)
 					break
 
-		return query_dct
+		return conditions

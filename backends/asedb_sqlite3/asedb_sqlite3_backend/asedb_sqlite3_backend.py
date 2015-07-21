@@ -1,6 +1,7 @@
 from abcd.backend import Backend
 import abcd.backend
 import abcd.results as results
+from abcd.query import Condition, And
 
 from ase.db import connect
 from ase.utils import plural
@@ -12,24 +13,33 @@ from itertools import imap, product
 from random import randint
 import glob
 
-def translate_query(query_dct):
-    keys = []
-    operators = []
-    operands_list = []
-    for key, conditions in query_dct.iteritems():
-        for cond in conditions:
-            keys.append(key)
-            operators.append(cond.operator)
-            operands_list.append(cond.operands)
+def translate_query(conditions):
 
-    operands_list = list(product(*operands_list))
+    # Split conditions with ANDed operands into
+    # multiple conditions
+    new_conditions = []
+    for i, cond in enumerate(conditions):
+        if cond.operand.linking_operator == 'and':
+            for val in cond.operand.list:
+                new_c = Condition(cond.key, cond.operator, And(val))
+                new_conditions.append(new_c)
+        else:
+            new_conditions.append(cond)
+    conditions = new_conditions
+
+    keys = [cond.key for cond in conditions]
+    operators = [cond.operator for cond in conditions]
+    link_operators = [cond.operand.linking_operator for cond in conditions]
+    value_list = list(product(*[cond.operand.list for cond in conditions]))
+    print value_list
 
     queries = []
-    for operands in operands_list:
+    for vals in value_list:
         q = []
         for i, key in enumerate(keys):
-            q.append('{}{}{}'.format(key, operators[i], operands[i]))
+            q.append('{}{}{}'.format(key, operators[i], vals[i]))
         queries.append(','.join(q))
+
     return queries
 
 class ASEdbSQlite3Backend(Backend):
