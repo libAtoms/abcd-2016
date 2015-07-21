@@ -120,6 +120,7 @@ class ASEdbSQlite3Backend(Backend):
             for row in rows_iter:
                 if row.unique_id not in ids:
                     rows.append(row)
+                    ids.append(row.unique_id)
         if limit != 0 and len(rows) > limit:
             return rows[:limit]
         else:
