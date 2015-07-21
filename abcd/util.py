@@ -167,15 +167,15 @@ class Table(object):
     def __init__(self, atoms_it):
         self.dicts = []
         for atoms in atoms_it:
-            old_dict = atoms2dict(atoms, True)
+            old_dict = atoms2plaindict(atoms)
             
             new_dict = dict(old_dict)
-            new_dict.pop('key_value_pairs', None)
-            new_dict.pop('data', None)
+            new_dict.pop('info', None)
+            new_dict.pop('arrays', None)
 
-            if old_dict['key_value_pairs']:
-                for key, value in old_dict['key_value_pairs'].iteritems():
-                    new_dict[key] = old_dict['key_value_pairs'][key]
+            if old_dict['info']:
+                for key, value in old_dict['info'].iteritems():
+                    new_dict[key] = old_dict['info'][key]
 
             new_dict['formula'] = (hill(atoms.numbers))
             self.dicts.append(new_dict)
