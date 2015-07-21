@@ -26,6 +26,7 @@ except ImportError as e:
 if backend_enabled:
     from structurebox import StructureBox
     from authentication import Credentials
+    from query import QueryTranslator
     from util import Table, atoms2plaindict, plaindict2atoms
     import json
     from base64 import b64encode, b64decode
@@ -60,7 +61,7 @@ def main(args = sys.argv[1:]):
 
     add = parser.add_argument
     add('database', nargs='?', help = 'Specify the database')
-    add('query', nargs = '?', default = '', help = 'Query')
+    add('query', nargs = '*', default = '', help = 'Query')
     add('--verbose', action='store_true', default=False)
     add('--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
@@ -208,9 +209,8 @@ def run(args, verbosity):
         return
 
     # Get the query
-    query = args.query
-    if query and query.isdigit():
-        query = int(query)
+    q = QueryTranslator(*args.query)
+    query = q.translate()
 
     # Decide which keys to show
     if args.keys == '++':

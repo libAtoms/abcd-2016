@@ -2,16 +2,35 @@ from abcd.backend import Backend
 import abcd.backend
 import abcd.results as results
 
-import os
-from ConfigParser import SafeConfigParser
-from itertools import imap
-
 from ase.db import connect
 from ase.utils import plural
 from ase.atoms import Atoms
 
+import os
+from ConfigParser import SafeConfigParser
+from itertools import imap, product
 from random import randint
 import glob
+
+def translate_query(query_dct):
+    keys = []
+    operators = []
+    operands_list = []
+    for key, conditions in query_dct.iteritems():
+        for cond in conditions:
+            keys.append(key)
+            operators.append(cond.operator)
+            operands_list.append(cond.operands)
+
+    operands_list = list(product(*operands_list))
+
+    queries = []
+    for operands in operands_list:
+        q = []
+        for i, key in enumerate(keys):
+            q.append('{}{}{}'.format(key, operators[i], operands[i]))
+        queries.append(','.join(q))
+    return queries
 
 class ASEdbSQlite3Backend(Backend):
 
@@ -91,6 +110,21 @@ class ASEdbSQlite3Backend(Backend):
 
         super(ASEdbSQlite3Backend, self).__init__()
 
+    def _select(self, query, sort=None, limit=0):
+        query = translate_query(query)
+        rows = []
+        ids = []
+        for q in query:
+            rows_iter = self.connection.select(q, sort=sort, limit=limit)
+            print q
+            for row in rows_iter:
+                if row.unique_id not in ids:
+                    rows.append(row)
+        if limit != 0 and len(rows) > limit:
+            return rows[:limit]
+        else:
+            return rows
+
     def list(self, auth_token):
         dbs = glob.glob(os.path.join(self.root_dir, '*.db'))
         return [os.path.basename(db) for db in dbs]
@@ -136,7 +170,7 @@ class ASEdbSQlite3Backend(Backend):
             limit = 1
         else:
             limit = 0
-        ids = [dct['id'] for dct in self.connection.select(filter, limit=limit)]
+        ids = [dct['id'] for dct in self._select(filter, limit=limit)]
         if confirm:
             msg = 'Delete {}? (yes/no): '.format(plural(len(ids), 'row'))
             if raw_input(msg).lower() != 'yes':
@@ -151,7 +185,7 @@ class ASEdbSQlite3Backend(Backend):
         if not sort:
             sort = 'id'
 
-        rows_iter = self.connection.select(filter, sort=sort, limit=limit)
+        rows_iter = self._select(filter, sort=sort, limit=limit)
 
         def row2atoms(row):
             atoms = row.toatoms(add_to_info_and_arrays=True)
@@ -176,13 +210,13 @@ class ASEdbSQlite3Backend(Backend):
         return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
 
     def add_kvp(self, auth_token, filter, kvp):
-        ids = [dct['id'] for dct in self.connection.select(filter)]
+        ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, [], **kvp)[0]
         msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))
         return results.AddKvpResult(modified_ids=[], no_of_kvp_added=n, msg=msg)
 
     def remove_keys(self, auth_token, filter, keys):
-        ids = [dct['id'] for dct in self.connection.select(filter)]
+        ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, keys)[1]
         msg = 'Removed {} keys in total from {} configurations'.format(n, len(ids))
         return results.RemoveKeysResult(modified_ids=ids, no_of_keys_removed=n, msg=msg)
