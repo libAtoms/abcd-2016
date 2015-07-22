@@ -8,7 +8,7 @@ To run the script locally a backend is needed, as well as the "prettytable" and 
 - ```cli.py --help``` - display help
 - ```cli.py --remote abcd@gc121mac1 db1.db --show```  - display the database
 - ```cli.py --remote abcd@gc121mac1 db1.db``` - display information about available keys
-- ```cli.py --remote abcd@gc121mac1 db1.db 'energy<0.6 id>4 id<20 id!=7,8,9'``` - querying
+- ```cli.py --remote abcd@gc121mac1 db1.db 'energy<0.6 id>4 id<20 id!=7,8,9 elements~C elements~H,F,Cl'``` - querying
 - ```cli.py --remote abcd@gc121mac1 db1.db --extract-files --target extracted``` - extract original files to the specified folder
 - ```cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz``` - write the first row to the file extr.xyz
 
