@@ -2,7 +2,6 @@
 
 ## Frontend
 
-* Translate the CLI query language to the mongodb query language. example: "energy<3 formula=H2O,H2O2" where spaces are ANDs and commas are ORs (ORs apply to multiple values to same key)
 * Ability to update configurations (check out, do some calculations, update the database). For this the ids need to be sorted out (configurations can be identified by their unique_id keys).
 * James: asedb-patch functionality should move to abcd. special properties that are stored in named asedb properties: number of atoms, cell, pbc, unique_id, ctime, mtime, user, positions, numbers
 * copy/move files from one database to another, including a new database
