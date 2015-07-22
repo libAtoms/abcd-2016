@@ -52,9 +52,13 @@ class Condition(object):
 class QueryTranslator(object):
 	def __init__(self, *args):
 		'''
-		:param *args: list of individual queries
+		:param *args: list of individual queries or string of queries 
+					separated by spaces.
 		'''
-		self.queries = args
+		queries = []
+		for arg in args:
+			queries += arg.split(' ')
+		self.queries = queries
 	
 	def translate(self):
 		'''
@@ -100,9 +104,13 @@ class QueryTranslator(object):
 			conditions.append(c)
 
 		for query in self.queries:
+			valid_query = False
 			for op in operators:
 				if op in query:
 					interpret(query, op)
+					valid_query = True
 					break
+			if not valid_query:
+				raise RuntimeError('Invalid query: {}'.format(query))
 
 		return conditions

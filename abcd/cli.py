@@ -36,7 +36,7 @@ description = ''
 examples = '''
     cli.py --remote abcd@gc121mac1 db1.db --show   (display the database)
     cli.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
-    cli.py --remote abcd@gc121mac1 db1.db \'energy<0.6,id>4\'   (querying)
+    cli.py --remote abcd@gc121mac1 db1.db \'energy<0.6 id>4 id<20 id!=10,11,12\'   (querying)
     cli.py --remote abcd@gc121mac1 db1.db --extract-files --target extracted/   (extract original files to the extracted/ folder)
     cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
     cli.py db1.db \'energy>0.7\' --count   (count number of selected rows)
