@@ -15,6 +15,7 @@
 ## asedb-based backend
 
 * Make sure unique ids stay the same when the configurations are moved around
+* Make searching of arrays contents possible.
 
 ## mongodb-based backend
 
