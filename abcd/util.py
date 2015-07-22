@@ -164,6 +164,9 @@ class Table(object):
     '''
     Class that holds a list of dictionaries (created from the Atoms object).
     '''
+
+    skip_cols = ['positions', 'forces', 'pbc', 'numbers', 'cell', 'stress']
+
     def __init__(self, atoms_it):
         self.dicts = []
         for atoms in atoms_it:
@@ -178,6 +181,7 @@ class Table(object):
                     new_dict[key] = old_dict['info'][key]
 
             new_dict['formula'] = (hill(atoms.numbers))
+            new_dict['n_atoms'] = len(atoms.numbers)
             self.dicts.append(new_dict)
 
     def _trim(self, str, length):
@@ -196,25 +200,33 @@ class Table(object):
         keys_list = self.keys_union()
 
         # Reorder the list
-        order = ['id', 'ctime', 'user', 'formula', 'config_type', 'calculator', 
+        order = ['id', 'ctime', 'user', 'formula', 'n_atoms', 'config_type', 'calculator', 
                     'calculator_parameters', 'positions', 'energy', 'stress', 
                     'forces', 'pbc', 'numbers']
         for key in reversed(order):
             if key in keys_list:
                 keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
-        t = PrettyTable([self._trim(key, 10) for key in keys_list])
+        t = PrettyTable([self._trim(key, 10) for key in keys_list if key not in self.skip_cols])
         t.padding_width = 0
+        no_rows = 0
         for dct in self.dicts:
             lst = []
             for key in keys_list:
+                if key in self.skip_cols:
+                    continue
                 if key in dct:
                     value = self._format_value(key, dct[key], 10)
                 else:
                     value = '-'
                 lst.append(value)
             t.add_row(lst)
-        return t.get_string()
+            no_rows += 1
+
+        s = t.get_string()
+        s += '\nRows: {}'.format(no_rows)
+        s += '\nNot displaying: {}'.format(self.skip_cols)
+        return s
 
     def values_range(self, key):
         values = []

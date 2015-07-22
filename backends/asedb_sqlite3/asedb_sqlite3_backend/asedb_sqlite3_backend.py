@@ -31,7 +31,6 @@ def translate_query(conditions):
     operators = [cond.operator for cond in conditions]
     link_operators = [cond.operand.linking_operator for cond in conditions]
     value_list = list(product(*[cond.operand.list for cond in conditions]))
-    print value_list
 
     queries = []
     for vals in value_list:
@@ -126,7 +125,6 @@ class ASEdbSQlite3Backend(Backend):
         ids = []
         for q in query:
             rows_iter = self.connection.select(q, sort=sort, limit=limit)
-            print q
             for row in rows_iter:
                 if row.unique_id not in ids:
                     rows.append(row)
