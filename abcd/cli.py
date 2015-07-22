@@ -162,7 +162,7 @@ def untar_file(fileobj, target, quiet=False):
         members = tar.getmembers()
         no_files = len(members)
         if not quiet:
-            print('  -> Writing {} files to {}/'.format(no_files, target))
+            print('  -> Writing {} file(s) to {}/'.format(no_files, target))
         tar.extractall(path=target)
         return [os.path.join(target, m.name) for m in members]
     except Exception as e:
@@ -277,11 +277,15 @@ def run(args, verbosity):
 
         filename = args.write_to_file
         if '.' in filename:
-            filename, format = filename.split('.')
+            filename, display_format = filename.split('.')
         else:
+            display_format = 'xyz'
+
+        # displayed_format will appear in the file name
+        if display_format == 'xyz':
             format = 'extxyz'
-        if format == 'xyz':
-            format = 'extxyz'
+        else:
+            format = display_format
 
         if ssh and not local:
             tarstring = StringIO.StringIO()
@@ -300,39 +304,55 @@ def run(args, verbosity):
             to_stderr('No atoms selected')
             return
 
-        if '%' not in filename and len(list_of_atoms) != 1:
-            to_stderr('Please specify the name formatting')
-            return
+        if '%' not in filename:
+            one_file = True
+        else:
+            one_file = False
 
-        for i, atoms in enumerate(list_of_atoms):
-            if '%' in filename:
-                name = filename % i + '.' + format
-            else:
-                name = filename + '.' + format
+        def add_atoms_to_tar(tar, atoms, name, format):
+            # For some reason tarring oesn't work
+            # if temp_s is used directly in the
+            # tar.addfile function. For this reason 
+            # the contents of temp_s are transferred
+            # to s.
+            temp_s = StringIO.StringIO()
+            ase_write(temp_s, atoms, format=format)
+            s = StringIO.StringIO(temp_s.getvalue())
+            temp_s.close()
 
+            info = tarfile.TarInfo(name=name)
+            info.size = len(s.buf)
+            tar.addfile(tarinfo=info, fileobj=s)
+            s.close()
+
+        def write_atoms_locally(atoms, name, format, target):
+            if not os.path.exists(target):
+                os.makedirs(target)
+            ase_write(os.path.join(target, name), atoms, format=format)
+
+        files_written = 0
+        if one_file:
+            name = filename + '.' + display_format
             if ssh and not local:
-                # For some reason tarring oesn't work
-                # if temp_s is used directly in the
-                # tar.addfile function. For this reason 
-                # the contents of temp_s are transferred
-                # to s.
-                temp_s = StringIO.StringIO()
-                ase_write(temp_s, atoms, format=format)
-                s = StringIO.StringIO(temp_s.getvalue())
-                temp_s.close()
-
-                info = tarfile.TarInfo(name=name)
-                info.size = len(s.buf)
-                tar.addfile(tarinfo=info, fileobj=s)
-                s.close()
+                add_atoms_to_tar(tar, list_of_atoms, name, format)
             else:
-                ase_write(name, atoms, format=format)
+                write_atoms_locally(list_of_atoms, name, format, args.target)
+                files_written = 1
+        else:
+            # Write extracted configurations into separate files
+            for i, atoms in enumerate(list_of_atoms):
+                name = filename % i + '.' + display_format
+                if ssh and not local:
+                    add_atoms_to_tar(tar, atoms, name, format)
+                else:
+                    write_atoms_locally(atoms, name, format, args.target)
+                    files_written += 1
 
         if ssh and not local:
             print(tarstring.getvalue())
             tar.close()
         else:
-            out('Wrote {} rows.'.format(len(list_of_atoms)))
+            out('  -> Writing {} file(s) to {}/'.format(files_written, args.target))
 
     # Receives the tar file and untars it
     elif args.extract_files and ssh and local:
