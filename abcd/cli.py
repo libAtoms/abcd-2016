@@ -27,7 +27,8 @@ if backend_enabled:
     from structurebox import StructureBox
     from authentication import Credentials
     from query import QueryTranslator
-    from util import Table, atoms2plaindict, plaindict2atoms
+    from table import Table
+    from util import atoms2plaindict, plaindict2atoms
     import json
     from base64 import b64encode, b64decode
 
@@ -619,7 +620,7 @@ def run(args, verbosity):
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         table = Table(atoms_it)
-        print(table)
+        table.print_rows()
 
     elif ssh and local:
         communicate_via_ssh(args.remote, sys.argv, tty=True)
