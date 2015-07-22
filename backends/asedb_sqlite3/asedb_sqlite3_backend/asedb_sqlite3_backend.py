@@ -36,7 +36,14 @@ def translate_query(conditions):
     for vals in value_list:
         q = []
         for i, key in enumerate(keys):
-            q.append('{}{}{}'.format(key, operators[i], vals[i]))
+            if key == 'elements' and operators[i] == '~':
+                q.append(vals[i])
+            elif key == 'elements' and operators[i] != '~':
+                raise RuntimeError('"elements" key can only be used with "~"')
+            elif operators[i] == '~' and key != 'elements':
+                raise RuntimeError('"~" can only be used with the "elements" key')
+            else:
+                q.append('{}{}{}'.format(key, operators[i], vals[i]))
         queries.append(','.join(q))
 
     return queries
