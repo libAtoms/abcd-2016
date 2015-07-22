@@ -572,12 +572,13 @@ def run(args, verbosity):
             tar_empty = False
             if directory:
                 # Tar the directory
-                tar.add(name=directory, exclude=exclude_fn)
+                arcname = os.path.basename(os.path.normpath(directory))
+                tar.add(name=directory, arcname=arcname, exclude=exclude_fn)
                 tar.close()
             else:
                 # Tar all the files together
                 for f in files:
-                    tar.add(name=f, exclude=exclude_fn)
+                    tar.add(name=f, arcname=os.path.basename(f), exclude=exclude_fn)
                 if not tar.getmembers():
                     tar_empty = True
                 tar.close()
