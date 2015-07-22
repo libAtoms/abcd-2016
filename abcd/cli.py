@@ -171,11 +171,18 @@ def untar_file(fileobj, target, quiet=False):
     finally:
         tar.close()
 
+def untar_and_delete(tar_files, target):
+    # Untar individual tarballs
+    for tarball in tar_files:
+        with open(tarball, 'r') as f:
+            untar_file(f, target, quiet=True)
+        os.remove(tarball)
+
 def run(args, verbosity):
 
     def out(*args):
         '''Prints information in accordance to verbosity'''
-        if verbosity > 0:
+        if verbosity > 0 and args and any(not arg.isspace() for arg in args):
             print(*(arg.rstrip('\n') for arg in args))
 
     def print_store_result(parsed, aux_files, database):
@@ -364,13 +371,15 @@ def run(args, verbosity):
             return
 
         s = StringIO.StringIO(stdout)
-        members = untar_file(s, args.target, quiet=args.untar)
+        members = untar_file(s, args.target, quiet=True)
 
         # Untar individual tarballs
         if args.untar:
-            for tarball in members:
-                with open(tarball, 'r') as f:
-                    untar_file(f, args.target, quiet=False)
+            untar_and_delete(members, args.target)
+            msg = '  Files were untarred to {}/'.format(args.target)
+        else:
+            msg = '  Files were written to {}/'.format(args.target)
+        out(msg)
 
     # Extract original file(s) from the database and write them
     # to the directory specified by the --target argument 
@@ -388,6 +397,7 @@ def run(args, verbosity):
         names = []
         unique_ids = []
         original_files =[]
+        skipped_configs = []
         nat = 0
         for atoms in box.find(auth_token=token, filter=query, 
                         sort=args.sort, reverse=args.reverse,
@@ -410,19 +420,27 @@ def run(args, verbosity):
             if len(indices) > 1:
                 for i in indices:
                     names[i] += '-' + unique_ids[i][-15:]
-        
-        nwrite = 0
-        skipped_configs = []
-        for i in range(len(names)):
-            # Add the file to the tar file which will
-            # be printed to stdout.
-            if ssh and not local:
+
+        extracted_paths = []
+
+        # Add the file to the tar file which will
+        # be printed to stdout.
+        if ssh and not local:
+            for i in range(len(names)):
                 filestring = StringIO.StringIO(b64decode(original_files[i]))
                 info = tarfile.TarInfo(name=names[i]+'.tar')
                 info.size = len(filestring.buf)
                 tar.addfile(tarinfo=info, fileobj=filestring)
+            tar.close()
+            print(c.getvalue())
+
+            msg = '  Extracted original files from {} configurations\n'.format(len(names))
+            if skipped_configs:
+                msg += '  No original files stored for configurations {}'.format(skipped_configs)
+            to_stderr(msg)
+        else:
             # Write the file locally
-            else:
+            for i in range(len(names)):
                 path = os.path.join(args.target, names[i]+'.tar')
 
                 if not os.path.exists(os.path.dirname(path)):
@@ -430,20 +448,20 @@ def run(args, verbosity):
                 elif os.path.exists(path):
                     out('{} already exists. Skipping write'.format(path))
 
-                out('  --> Writing {} files to {}/'.format(path, args.target))            
                 with open(path, 'w') as original_file:
                     original_file.write(b64decode(original_files[i]))
-            nwrite += 1
+                    extracted_paths.append(path)
 
-        msg = 'Extracted original output files for %d/%d selected configurations' % (nwrite, nat)
-        if skipped_configs:
-            msg += '\nNo original file stored for configurations {}'.format(skipped_configs)
+            msg = '  Extracted original files from {} configurations\n'.format(len(extracted_paths))
+            if skipped_configs:
+                msg += '  No original files stored for configurations {}\n'.format(skipped_configs)
 
-        if ssh and not local:
-            print(c.getvalue())
-            to_stderr(msg)
-            tar.close()
-        else:
+            # Untar individual tarballs
+            if args.untar:
+                untar_and_delete(extracted_paths, args.target)
+                msg += '  Files were untarred to {}/'.format(args.target)
+            else:
+                msg += '  Files were written to {}/'.format(args.target)
             out(msg)
 
     # Receive configurations via stdin and write it to the database
