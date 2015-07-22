@@ -1,7 +1,7 @@
 __author__ = 'Patrick Szmucer'
 
 '''
-*QUERYING CONVENTION*
+QUERYING CONVENTION
 Query is a list of the Condition objects. Each Condition object specifies
 the following:
 - key - a key that will be searched. Searchable Atoms properties are all
@@ -9,13 +9,20 @@ the following:
 		Arrays are not searchable. A number of additional keys which are 
 		not directly stored in the atoms object can be specified. These 
 		are specified below as "additional_keys".
-- operator - one of ['=', '!=', '>', '>=', '<', '<=']
+- operator - one of:
+	'=' - equal
+	'!=' - not equal
+	'>' - greater
+	'>=' - greater or equal
+	'<' - less
+	'<=' - less or equal
+	'~' - contains
 - operand - LogicalList, which is a list of items linked by and/or.
 
 This list of queries is sent to the backend which then interprets it.
 '''
 
-operators = ['=', '!=', '>', '>=', '<', '<=']
+operators = ['=', '!=', '>', '>=', '<', '<=', '~']
 additional_keys = ['formula', 'natoms']
 
 class LogicalList(object):

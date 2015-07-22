@@ -139,7 +139,8 @@ class ASEdbSQlite3Backend(Backend):
 
         # Because a union was created, items are not in a sorted order
         # anymore.
-        rows.sort(key=lambda x: getattr(x, sort), reverse=reverse)
+        if sort:
+            rows.sort(key=lambda x: getattr(x, sort), reverse=reverse)
 
         if limit != 0 and len(rows) > limit:
             return rows[:limit]
@@ -230,7 +231,7 @@ class ASEdbSQlite3Backend(Backend):
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
 
-    def add_kvp(self, auth_token, filter, kvp):
+    def add_keys(self, auth_token, filter, kvp):
         ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, [], **kvp)[0]
         msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))

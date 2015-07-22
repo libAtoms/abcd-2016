@@ -105,7 +105,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def add_kvp(self, auth_token, filter, kvp):
+    def add_keys(self, auth_token, filter, kvp):
         """
         Adds key-value pairs to the selectd configurations
 
