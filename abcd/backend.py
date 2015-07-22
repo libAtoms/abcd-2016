@@ -87,15 +87,15 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def find(self, auth_token, filter, sort, limit, keys, omit_keys):
+    def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
         """
         Find entries that match the filter
 
         :param AuthToken auth_token: Authorisation token
-        :param filter: Filter (in MongoDB query language)
-        :type filter: dictionary?
-        :param sort: Sort by
-        :type sort: string?
+        :param filter: Filter
+        :type filter: list of Conditions
+        :param string sort: Sort in increasing order
+        :param bool reverse: Reverse the sorting order
         :param int limit: limit the number of returned entries
         :param list keys: keys to be returned. '++' for all
         :param list keys: keys to be omitted

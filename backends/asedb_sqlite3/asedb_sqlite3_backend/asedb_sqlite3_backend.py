@@ -120,7 +120,7 @@ class ASEdbSQlite3Backend(Backend):
 
         super(ASEdbSQlite3Backend, self).__init__()
 
-    def _select(self, query, sort=None, limit=0):
+    def _select(self, query, sort=None, reverse=False, limit=0):
         query = translate_query(query)
         rows = []
         ids = []
@@ -131,6 +131,11 @@ class ASEdbSQlite3Backend(Backend):
                 if row.unique_id not in ids:
                     rows.append(row)
                     ids.append(row.unique_id)
+
+        # Because a union was created, items are not in a sorted order
+        # anymore.
+        rows.sort(key=lambda x: getattr(x, sort), reverse=reverse)
+
         if limit != 0 and len(rows) > limit:
             return rows[:limit]
         else:
@@ -192,11 +197,11 @@ class ASEdbSQlite3Backend(Backend):
         return results.RemoveResult(removed_count=len(ids), msg=msg)
 
     @require_database
-    def find(self, auth_token, filter, sort, limit, keys, omit_keys):
+    def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
         if not sort:
             sort = 'id'
 
-        rows_iter = self._select(filter, sort=sort, limit=limit)
+        rows_iter = self._select(filter, sort=sort, reverse=reverse, limit=limit)
 
         def row2atoms(row):
             atoms = row.toatoms(add_to_info_and_arrays=True)

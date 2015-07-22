@@ -74,7 +74,8 @@ def main(args = sys.argv[1:]):
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
     add('--sort', metavar='COL', default=None,
-        help='Specify the column to sort the rows by')
+        help='Specify the column to sort the rows by. Default is increasing order \n(change it using --reverse)')
+    add('--reverse', action='store_true', default=False, help='Reverses the sorting order')
     add('--count', action='store_true',
         help='Count number of selected rows.')
     add('--keys', default='++', help='Select only specified keys')
@@ -275,8 +276,8 @@ def run(args, verbosity):
         list_of_atoms = []
         omit = omit_keys + ['original_file_contents']
         for atoms in box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit,
-                            keys=keys, omit_keys=omit):
+                            sort=args.sort, reverse=args.reverse,
+                            limit=args.limit, keys=keys, omit_keys=omit):
             list_of_atoms.append(atoms)
             nrows += 1
 
@@ -354,7 +355,8 @@ def run(args, verbosity):
         original_files =[]
         nat = 0
         for atoms in box.find(auth_token=token, filter=query, 
-                        sort=args.sort, limit=args.limit,
+                        sort=args.sort, reverse=args.reverse,
+                        limit=args.limit,
                         keys=['original_file_contents', 'unique_id']):
             nat += 1
             if 'original_file_contents' not in atoms.info:
@@ -598,8 +600,8 @@ def run(args, verbosity):
         else:
             lim = args.limit + 1
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=lim,
-                            keys=keys, omit_keys=omit_keys)
+                            sort=args.sort, reverse=args.reverse,
+                            limit=lim, keys=keys, omit_keys=omit_keys)
         count = atoms_it.count()
         if args.limit != 0 and count > args.limit:
             count = '{}+'.format(count-1)
@@ -614,8 +616,8 @@ def run(args, verbosity):
     elif args.show:
         box, token = init_backend(args.database, args.user)
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit,
-                            keys=keys, omit_keys=omit_keys)
+                            sort=args.sort, reverse=args.reverse,
+                            limit=args.limit, keys=keys, omit_keys=omit_keys)
         table = Table(atoms_it)
         print(table)
 
@@ -628,8 +630,8 @@ def run(args, verbosity):
     elif args.ids:
         box, token = init_backend(args.database, args.user)
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit,
-                            keys=keys, omit_keys=omit_keys)
+                            sort=args.sort, reverse=args.reverse,
+                            limit=args.limit, keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
             print(atoms.info['unique_id'])
 
@@ -637,8 +639,8 @@ def run(args, verbosity):
     else:
         box, token = init_backend(args.database, args.user)
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, limit=args.limit,
-                            keys=keys, omit_keys=omit_keys)
+                            sort=args.sort, reverse=args.reverse,
+                            limit=args.limit, keys=keys, omit_keys=omit_keys)
 
         table = Table(atoms_it)
         table.print_keys_table()

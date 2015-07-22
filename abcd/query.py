@@ -3,9 +3,18 @@ __author__ = 'Patrick Szmucer'
 operators = ['=', '!=', '>', '>=', '<', '<=']
 
 class LogicalList(object):
+	'''
+	List of items linked by a logical operator
+	"and" or "or".
+	'''
+
 	linking_operators = ['and', 'or']
 
 	def __init__(self, operator, lst):
+		'''
+		:param string operator: One of and/or
+		:param list lst: list of items
+		'''
 		if operator not in self.linking_operators:
 			raise RuntimeError('Unsupported operator {}'.format(operator))
 		self.linking_operator = operator
