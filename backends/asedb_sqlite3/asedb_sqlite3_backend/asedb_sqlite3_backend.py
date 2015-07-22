@@ -97,6 +97,7 @@ class ASEdbSQlite3Backend(Backend):
         self.user = user
         self.dbs_path = get_dbs_path()
         self.connection = None
+        self.root_dir = None
 
         # Check if the databases directory exists. If not , create it
         if not os.path.isdir(self.dbs_path):
@@ -118,11 +119,8 @@ class ASEdbSQlite3Backend(Backend):
         # root_dir is the directory in which user's databases are stored
         self.root_dir = os.path.join(self.dbs_path, home)
 
-        # Try to connect to the database if it was supplied as an argument
         if database:
-            database = os.path.basename(database)
-            if not self.connect_to_database(database):
-                raise Exception('{} does not exist'.format(database))
+            self.connect_to_database(database)
 
         super(ASEdbSQlite3Backend, self).__init__()
 
@@ -154,14 +152,35 @@ class ASEdbSQlite3Backend(Backend):
     def authenticate(self, credentials):
         return credentials.username
 
-    def connect_to_database(self, database):
+    def connect_to_database(self, database, create_new=True):
         '''
-        Connects to the database if it exists.
-        If it doesn't exist, a new database is created.
+        Connnects to a database with given name. If it doesn't
+        exist, a new one is created.
         '''
-        file_path = os.path.join(self.root_dir, database)
-        self.connection = connect(file_path)
-        return True
+        if '.db' not in database:
+            database += '.db'
+
+        # Look inside the root_dir to see if the datbase exists
+        if not os.path.isfile(os.path.join(self.root_dir, database)):
+            if not create_new:
+                raise RuntimeError('Database {} does not exist'.format(database))
+            else:
+                # Database does not exist. Create a new one.
+                if self.user:
+                    new_db_name = '_' + self.user + '_' + database
+                else:
+                    new_db_name = database
+                new_db_path = os.path.join(self.dbs_path, 'all', new_db_name)
+                self.connection = connect(new_db_path)
+
+                # Create a symlink
+                if self.user:
+                    user_db_path = os.path.join(self.root_dir, database)
+                    os.symlink(new_db_path, user_db_path)
+        else:
+            # Database exists. Connect to it.
+            db_path = os.path.join(self.root_dir, database)
+            self.connection = connect(db_path)
 
     @require_database
     def insert(self, auth_token, atoms, kvp):
