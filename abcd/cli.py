@@ -71,7 +71,7 @@ def main(args = sys.argv[1:]):
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
     add('--show', action='store_true', help='Show the database')
-    add('--limit', type=int, default=500, metavar='N',
+    add('--limit', type=int, default=0, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
     add('--sort', metavar='COL', default=None,
@@ -81,7 +81,7 @@ def main(args = sys.argv[1:]):
         help='Count number of selected rows.')
     add('--keys', default='++', help='Select only specified keys')
     add('--omit-keys', default='', help='Don\'t select these keys')
-    add('--add-kvp', metavar='{K1=V1,...}', help='Add key-value pairs')
+    add('--add-keys', metavar='{K1=V1,...}', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     add('--remove', action='store_true',
         help='Remove selected rows.')
@@ -178,6 +178,20 @@ def run(args, verbosity):
         if verbosity > 0:
             print(*(arg.rstrip('\n') for arg in args))
 
+    def print_store_result(parsed, aux_files, database):
+        out('  --> Added {} configuration(s) to {}'
+                    .format(len(parsed), database))
+        if aux_files:
+            out('Original files included with each configuration:')
+            for f in aux_files:
+                out('  ', f)
+
+        not_included = set([dct['config_path'] for dct in parsed if not dct['attach_original']])
+        if not_included:
+            out('The following files were not included as original files:')
+        for f in not_included:
+            out('  ', f)
+
     # Detect if the script is running over ssh
     if args.ssh:
         local = False
@@ -223,8 +237,8 @@ def run(args, verbosity):
 
     # Get kvp
     kvp = {}
-    if args.add_kvp:
-        for pair in args.add_kvp.split(','):
+    if args.add_keys:
+        for pair in args.add_keys.split(','):
             k, v = pair.split('=')
             kvp[k] = convert_str_to_float_or_str(v)
 
@@ -433,18 +447,7 @@ def run(args, verbosity):
         for dct in parsed:
             box.insert(token, dct['atoms'], kvp)
 
-        out('  --> Added {} configuration(s) to {}'
-                .format(len(parsed), args.database))
-        if aux_files:
-            out('Auxilary files inclued with each configuration:')
-            for f in aux_files:
-                out('  ', f)
-
-        not_included = set([dct['config_path'] for dct in parsed if not dct['attach_original']])
-        if not_included:
-            out('The following original files were not included:')
-        for f in not_included:
-            out('  ', f)
+        print_store_result(parsed, aux_files, args.database)
 
     elif args.store:
         if query:
@@ -560,25 +563,14 @@ def run(args, verbosity):
             atoms_list = [dct['atoms'] for dct in parsed]
             box.insert(token, atoms_list, kvp)
 
-            out('  --> Added {} configuration(s) to {}'
-                .format(len(parsed), args.database))
-            if aux_files:
-                out('Auxilary files inclued with each configuration:')
-                for f in aux_files:
-                    out('  ', f)
+            print_store_result(parsed, aux_files, args.database)
 
-            not_included = set([dct['config_path'] for dct in parsed if not dct['attach_original']])
-            if not_included:
-                out('The following original files were not included:')
-            for f in not_included:
-                out('  ', f)
-
-    elif args.add_kvp:
+    elif args.add_keys:
         if ssh and local:
             communicate_via_ssh(args.remote, sys.argv, tty=True)
         else:
             box, token = init_backend(args.database, args.user)
-            result = box.add_kvp(token, query, kvp)
+            result = box.add_keys(token, query, kvp)
             print(result.msg)
 
     elif args.remove_keys:
