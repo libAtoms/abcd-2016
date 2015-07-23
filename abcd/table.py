@@ -5,15 +5,12 @@ from ase.utils import hill
 from prettytable import PrettyTable
 import time
 
-T2000 = 946681200.0  # January 1. 2000
-YEAR = 31557600.0  # 365.25 days
-
 class Table(object):
     '''
     Class that holds a list of dictionaries (created from the Atoms object).
     '''
 
-    skip_cols = ['positions', 'forces', 'pbc', 'numbers', 'cell', 'stress']
+    skip_cols = ['positions', 'forces', 'pbc', 'numbers', 'cell', 'stress', 'm_time']
 
     def __init__(self, atoms_it):
         self.dicts = []
@@ -28,8 +25,6 @@ class Table(object):
                 for key, value in old_dict['info'].iteritems():
                     new_dict[key] = old_dict['info'][key]
 
-            new_dict['formula'] = (hill(atoms.numbers))
-            new_dict['n_atoms'] = len(atoms.numbers)
             self.dicts.append(new_dict)
 
     def _trim(self, str, length):
@@ -38,17 +33,19 @@ class Table(object):
         else:
             return str
 
-    def _format_value(self, key, value, max_len):
-        if key == 'ctime':
-            value = time.strftime('%d/%m/%y %H:%M:%S', 
-                    time.localtime(value*YEAR+T2000))
+    def _format_value(self, key, value, max_len, force=False):
+        if key == 'c_time' or key == 'm_time':
+            value = time.strftime('%d%b%y %H:%M', time.localtime(value))
+            max_len = 13
+        elif key == 'uid':
+            max_len = 15
         return self._trim(str(value), max_len)
 
     def print_rows(self):
         keys_list = self.keys_union()
 
         # Reorder the list
-        order = ['id', 'ctime', 'user', 'formula', 'n_atoms', 'config_type', 'calculator', 
+        order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'config_type', 'calculator', 
                     'calculator_parameters', 'positions', 'energy', 'stress', 
                     'forces', 'pbc', 'numbers']
         for key in reversed(order):
@@ -64,7 +61,7 @@ class Table(object):
                 if key in self.skip_cols:
                     continue
                 if key in dct:
-                    value = self._format_value(key, dct[key], 10)
+                    value = self._format_value(key, dct[key], 6)
                 else:
                     value = '-'
                 lst.append(value)

@@ -185,9 +185,29 @@ def run(args, verbosity):
         if verbosity > 0 and args and any(not arg.isspace() for arg in args):
             print(*(arg.rstrip('\n') for arg in args))
 
-    def print_store_result(parsed, aux_files, database):
-        out('  --> Added {} configuration(s) to {}'
-                    .format(len(parsed), database))
+    def print_store_result(result, parsed, aux_files, database):
+        stored = result.inserted_ids
+        skipped = result.skipped_ids
+
+        if len(stored) == 1:
+            s = ''
+        else:
+            s = 's'
+        out('  --> Added {} configuration{} to {}'
+            .format(len(stored), s, database))
+        if skipped:
+            if len(skipped) == 1:
+                s1 = ''
+                s2 = 'was'
+                s3 = 'exists'
+            else:
+                s1 = 's'
+                s2 = 'were'
+                s3 = 'exist'
+            out('{} configuration{} {} not added (uid{} already {}):'.format(len(skipped), s1, s2, s1, s3))
+            for conf_id in skipped:
+                out('  {}'.format(conf_id))
+
         if aux_files:
             out('Original files included with each configuration:')
             for f in aux_files:
@@ -402,7 +422,7 @@ def run(args, verbosity):
         for atoms in box.find(auth_token=token, filter=query, 
                         sort=args.sort, reverse=args.reverse,
                         limit=args.limit,
-                        keys=['original_file_contents', 'unique_id']):
+                        keys=['original_file_contents', 'uid']):
             nat += 1
             if 'original_file_contents' not in atoms.info:
                 skipped_configs.append(nat)
@@ -411,7 +431,7 @@ def run(args, verbosity):
             if len(name) > 15:
                 name = str[:15]
             names.append(name)
-            unique_ids.append(atoms.info['unique_id'])
+            unique_ids.append(atoms.info['uid'])
             original_files.append(atoms.info['original_file_contents'])
 
         # Mangle the names
@@ -482,10 +502,8 @@ def run(args, verbosity):
             to_stderr('No atoms received')
             return
         
-        for dct in parsed:
-            box.insert(token, dct['atoms'], kvp)
-
-        print_store_result(parsed, aux_files, args.database)
+        result = box.insert(token, (dct['atoms'] for dct in parsed), kvp)
+        print_store_result(result, parsed, aux_files, args.database)
 
     elif args.store:
         if query:
@@ -600,9 +618,9 @@ def run(args, verbosity):
             # Write atoms to the database
             box, token = init_backend(args.database, args.user)
             atoms_list = [dct['atoms'] for dct in parsed]
-            box.insert(token, atoms_list, kvp)
+            result = box.insert(token, atoms_list, kvp)
 
-            print_store_result(parsed, aux_files, args.database)
+            print_store_result(result, parsed, aux_files, args.database)
 
     elif args.add_keys:
         if ssh and local:
@@ -665,7 +683,7 @@ def run(args, verbosity):
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
-            print(atoms.info['unique_id'])
+            print(atoms.info['uid'])
 
     # Print info about keys
     else:

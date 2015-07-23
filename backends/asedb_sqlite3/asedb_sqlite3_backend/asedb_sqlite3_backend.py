@@ -12,6 +12,7 @@ from ConfigParser import SafeConfigParser
 from itertools import imap, product
 from random import randint
 import glob
+import time
 
 def translate_query(conditions):
 
@@ -131,9 +132,9 @@ class ASEdbSQlite3Backend(Backend):
         for q in query:
             rows_iter = self.connection.select(q, sort=sort, limit=limit)
             for row in rows_iter:
-                if row.unique_id not in ids:
+                if row.key_value_pairs['uid'] not in ids:
                     rows.append(row)
-                    ids.append(row.unique_id)
+                    ids.append(row.key_value_pairs['uid'])
 
         # Because a union was created, items are not in a sorted order
         # anymore.
@@ -185,21 +186,53 @@ class ASEdbSQlite3Backend(Backend):
     @require_database
     def insert(self, auth_token, atoms, kvp):
 
-        def insert_atoms(atoms):
+        def insert_atoms(atoms, inserted_ids, skipped_ids):
             atoms.info.pop('id', None)
-            if not 'unique_id' in atoms.info:
-                atoms.info['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
-            return self.connection.write(atoms=atoms, key_value_pairs=kvp, add_from_info_and_arrays=True)
 
-        ids = []
+            # Check if it already exists in the database
+            exists = False
+            if 'uid' in atoms.info:
+                uid = atoms.info['uid']
+                query = 'uid={}'.format(uid)
+                rows_it = self.connection.select(query, limit=0)
+                if sum(1 for _ in rows_it) != 0:
+                    exists = True
+
+            if not exists:
+                # Add a unique id if it's not present
+                if not 'uid' in atoms.info:
+                    atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
+                uid = atoms.info['uid']
+
+                # Add a creation time if it's not present
+                if not 'c_time' in atoms.info:
+                    atoms.info['c_time'] = int(time.time())
+
+                # Change the modification time
+                atoms.info['m_time'] = int(time.time())
+
+                # Update the formula and n_atoms
+                atoms.info['formula'] = atoms.get_chemical_formula()
+                atoms.info['n_atoms'] = len(atoms.numbers)
+
+                self.connection.write(atoms=atoms, key_value_pairs=kvp, add_from_info_and_arrays=True)
+                inserted_ids.append(uid)
+            else:
+                skipped_ids.append(uid)
+
+        inserted_ids = []
+        skipped_ids = []
+        n_atoms = 0
         if isinstance(atoms, Atoms):
-            ids.append(insert_atoms(atoms))
+            insert_atoms(atoms, inserted_ids, skipped_ids)
+            n_atoms += 1
         else:
             # Assume it's an iterable
             for ats in atoms:
-                ids.append(insert_atoms(ats))
-        msg = 'Inserted {} configurations'.format(len(ids))
-        return results.InsertResult(inserted_ids=ids, msg=msg)
+                insert_atoms(ats, inserted_ids, skipped_ids)
+                n_atoms += 1
+        msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
+        return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
 
     @require_database
     def update(self, auth_token, atoms):
@@ -230,11 +263,8 @@ class ASEdbSQlite3Backend(Backend):
 
         def row2atoms(row):
             atoms = row.toatoms(add_to_info_and_arrays=True)
-            atoms.info['id'] = row.id
-            atoms.info['user'] = row.user
-            atoms.info['ctime'] = row.ctime
 
-            keys_to_delete = []
+            keys_to_delete = ['unique_id']
             if keys != '++':
                 for key in atoms.info:
                     if key not in keys:

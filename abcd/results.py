@@ -27,13 +27,18 @@ class RemoveResult(Result):
 
 
 class InsertResult(Result):
-    def __init__(self, inserted_ids, msg=None):
+    def __init__(self, inserted_ids, skipped_ids, msg=None):
         self._inserted_ids = inserted_ids
+        self._skipped_ids = skipped_ids
         super(InsertResult, self).__init__(msg)
 
     @property
     def inserted_ids(self):
         return self._inserted_ids
+
+    @property
+    def skipped_ids(self):
+        return self._skipped_ids
 
 class UpdateResult(Result):
     def __init__(self, updated_ids, msg=None):
