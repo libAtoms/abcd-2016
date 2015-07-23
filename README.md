@@ -9,7 +9,7 @@ To run the script locally a backend is needed, as well as the "prettytable" and 
 - ```cli.py --remote abcd@gc121mac1 db1.db --show```  - display the database
 - ```cli.py --remote abcd@gc121mac1 db1.db``` - display information about available keys
 - ```cli.py --remote abcd@gc121mac1 db1.db 'energy<0.6 id>4 id<20 id!=7,8,9 elements~C elements~H,F,Cl'``` - querying
-- ```cli.py --remote abcd@gc121mac1 db1.db --extract-files --target extracted``` - extract original files to the specified folder
+- ```cli.py --remote abcd@gc121mac1 db1.db --extract-original-files --path-prefix extracted``` - extract original files to the specified folder
 - ```cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz``` - write the first row to the file extr.xyz
 
 ### Examples of running locally
@@ -19,6 +19,22 @@ To run the script locally a backend is needed, as well as the "prettytable" and 
 - ```cli.py db1.db --store conf1.xyz conf2.xyz info.txt``` - store original files in the database
 - ```cli.py db1.db --store configs/``` - store the whole directory in the database
 - ```cli.py db1.db --omit-keys 'user,id' --show``` - omit keys "user" and "id"
+
+### Queries
+
+Queries are in a form <key><operator><val1,val2,...> <key><operator><val1,val2...>. <k><op><val> expressions separated by spaces are assumed to be ANDed, while values separated by commas are assumed to be ORed. Example:  
+
+- ```'energy<0.1 user=alice,bob test=1'``` - means "*energy* less than 0.1 AND *user* is alice or bob AND *test* is equal to 1"  
+
+Key can be any key in the Atoms.info dictionary. Operator can be one of the ```=, !=, <, <=, >, >=, ~```, where "~" means "contains" and can be used with the special key "elements":  
+
+- ```elements~C elements~H,F,Cl``` - means "contains C AND at least one of H, F and Cl"
+
+Operator ```!=``` is an exception, because comma-separated values that follow it are assumed to be ANDed, not ORed:  
+
+- ```user!=alice,bob``` - means "*user* is not alice AND not bob"
+
+Note that if a query contains "<" or ">" it needs to be enclosed in quotes.
 
 ### Installing
 
