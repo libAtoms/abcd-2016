@@ -38,7 +38,7 @@ examples = '''
     cli.py --remote abcd@gc121mac1 db1.db --show   (display the database)
     cli.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
     cli.py --remote abcd@gc121mac1 db1.db \'energy<0.6 id>4 id<20 id!=10,11,12 elements~C elements~H,F,Cl\'   (querying)
-    cli.py --remote abcd@gc121mac1 db1.db --extract-files --target extracted/   (extract original files to the extracted/ folder)
+    cli.py --remote abcd@gc121mac1 db1.db --extract-original-files --path-prefix extracted/   (extract original files to the extracted/ folder)
     cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
     cli.py db1.db \'energy>0.7\' --count   (count number of selected rows)
     cli.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
@@ -88,11 +88,11 @@ def main(args = sys.argv[1:]):
     add('--no-confirmation', action='store_true',
         help='Don\'t ask for confirmation')
     add('--store', metavar='', nargs='+', help='Store a directory / list of files')
-    add('--extract-files', action='store_true',
+    add('--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
     add('--untar', action='store_true', default=False,
         help='Automaticall untar files extracted with --extract-files')
-    add('--target', default='.', help='Target directory for extracted files')
+    add('--path-prefix', default='.', help='Path prefix for extracted files')
     add('--write-to-file', metavar='(type:)filename',
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('--ids', action='store_true', help='Print unique ids of selected configurations')
@@ -156,26 +156,26 @@ def to_stderr(*args):
     if args and any(not arg.isspace() for arg in args):
         print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
 
-def untar_file(fileobj, target, quiet=False):
+def untar_file(fileobj, path_prefix, quiet=False):
     try:
         tar = tarfile.open(fileobj=fileobj, mode='r')
         members = tar.getmembers()
         no_files = len(members)
         if not quiet:
-            print('  -> Writing {} file(s) to {}/'.format(no_files, target))
-        tar.extractall(path=target)
-        return [os.path.join(target, m.name) for m in members]
+            print('  -> Writing {} file(s) to {}/'.format(no_files, path_prefix))
+        tar.extractall(path=path_prefix)
+        return [os.path.join(path_prefix, m.name) for m in members]
     except Exception as e:
         to_stderr(str(e))
         return None
     finally:
         tar.close()
 
-def untar_and_delete(tar_files, target):
+def untar_and_delete(tar_files, path_prefix):
     # Untar individual tarballs
     for tarball in tar_files:
         with open(tarball, 'r') as f:
-            untar_file(f, target, quiet=True)
+            untar_file(f, path_prefix, quiet=True)
         os.remove(tarball)
 
 def run(args, verbosity):
@@ -275,7 +275,7 @@ def run(args, verbosity):
             return
 
         s = StringIO.StringIO(stdout)
-        untar_file(s, args.target)
+        untar_file(s, args.path_prefix)
 
     # Extract a configuration from the database and write it
     # to the specified file.
@@ -332,10 +332,10 @@ def run(args, verbosity):
             tar.addfile(tarinfo=info, fileobj=s)
             s.close()
 
-        def write_atoms_locally(atoms, name, format, target):
-            if not os.path.exists(target):
-                os.makedirs(target)
-            ase_write(os.path.join(target, name), atoms, format=format)
+        def write_atoms_locally(atoms, name, format, path_prefix):
+            if not os.path.exists(path_prefix):
+                os.makedirs(path_prefix)
+            ase_write(os.path.join(path_prefix, name), atoms, format=format)
 
         files_written = 0
         if one_file:
@@ -343,7 +343,7 @@ def run(args, verbosity):
             if ssh and not local:
                 add_atoms_to_tar(tar, list_of_atoms, name, format)
             else:
-                write_atoms_locally(list_of_atoms, name, format, args.target)
+                write_atoms_locally(list_of_atoms, name, format, args.path_prefix)
                 files_written = 1
         else:
             # Write extracted configurations into separate files
@@ -352,17 +352,17 @@ def run(args, verbosity):
                 if ssh and not local:
                     add_atoms_to_tar(tar, atoms, name, format)
                 else:
-                    write_atoms_locally(atoms, name, format, args.target)
+                    write_atoms_locally(atoms, name, format, args.path_prefix)
                     files_written += 1
 
         if ssh and not local:
             print(tarstring.getvalue())
             tar.close()
         else:
-            out('  -> Writing {} file(s) to {}/'.format(files_written, args.target))
+            out('  -> Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
 
     # Receives the tar file and untars it
-    elif args.extract_files and ssh and local:
+    elif args.extract_original_files and ssh and local:
         stdout, stderr, ret = communicate_via_ssh(args.remote, sys.argv, tty=False)
 
         if stderr and not stderr.isspace():
@@ -371,21 +371,21 @@ def run(args, verbosity):
             return
 
         s = StringIO.StringIO(stdout)
-        members = untar_file(s, args.target, quiet=True)
+        members = untar_file(s, args.path_prefix, quiet=True)
 
         # Untar individual tarballs
         if args.untar:
-            untar_and_delete(members, args.target)
-            msg = '  Files were untarred to {}/'.format(args.target)
+            untar_and_delete(members, args.path_prefix)
+            msg = '  Files were untarred to {}/'.format(args.path_prefix)
         else:
-            msg = '  Files were written to {}/'.format(args.target)
+            msg = '  Files were written to {}/'.format(args.path_prefix)
         out(msg)
 
     # Extract original file(s) from the database and write them
-    # to the directory specified by the --target argument 
+    # to the directory specified by the --path-prefix argument 
     # (current directory by default), or print the file
     # to stdout.
-    elif args.extract_files:
+    elif args.extract_original_files:
         box, token = init_backend(args.database, args.user)
 
         # If over ssh, create a tar file in memory
@@ -441,7 +441,7 @@ def run(args, verbosity):
         else:
             # Write the file locally
             for i in range(len(names)):
-                path = os.path.join(args.target, names[i]+'.tar')
+                path = os.path.join(args.path_prefix, names[i]+'.tar')
 
                 if not os.path.exists(os.path.dirname(path)):
                     os.makedirs(os.path.dirname(path))
@@ -458,10 +458,10 @@ def run(args, verbosity):
 
             # Untar individual tarballs
             if args.untar:
-                untar_and_delete(extracted_paths, args.target)
-                msg += '  Files were untarred to {}/'.format(args.target)
+                untar_and_delete(extracted_paths, args.path_prefix)
+                msg += '  Files were untarred to {}/'.format(args.path_prefix)
             else:
-                msg += '  Files were written to {}/'.format(args.target)
+                msg += '  Files were written to {}/'.format(args.path_prefix)
             out(msg)
 
     # Receive configurations via stdin and write it to the database
