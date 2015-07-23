@@ -191,7 +191,7 @@ class ASEdbSQlite3Backend(Backend):
 
             # Check if it already exists in the database
             exists = False
-            if 'uid' in atoms.info:
+            if 'uid' in atoms.info and atoms.info['uid'] is not None:
                 uid = atoms.info['uid']
                 query = 'uid={}'.format(uid)
                 rows_it = self.connection.select(query, limit=0)
@@ -200,7 +200,7 @@ class ASEdbSQlite3Backend(Backend):
 
             if not exists:
                 # Add a unique id if it's not present
-                if not 'uid' in atoms.info:
+                if not 'uid' in atoms.info or atoms.info['uid'] is None:
                     atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
                 uid = atoms.info['uid']
 
