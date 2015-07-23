@@ -132,7 +132,9 @@ class ASEdbSQlite3Backend(Backend):
         for q in query:
             rows_iter = self.connection.select(q, sort=sort, limit=limit)
             for row in rows_iter:
-                if row.key_value_pairs['uid'] not in ids:
+                if 'uid' not in row.key_value_pairs:
+                    rows.append(row)
+                elif row.key_value_pairs['uid'] not in ids:
                     rows.append(row)
                     ids.append(row.key_value_pairs['uid'])
 
