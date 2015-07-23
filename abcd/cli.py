@@ -408,8 +408,8 @@ def run(args, verbosity):
                 skipped_configs.append(nat)
                 continue
             name = atoms.get_chemical_formula()
-            if len(name) > 10:
-                name = str[:10]
+            if len(name) > 15:
+                name = str[:15]
             names.append(name)
             unique_ids.append(atoms.info['unique_id'])
             original_files.append(atoms.info['original_file_contents'])
