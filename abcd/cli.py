@@ -145,8 +145,7 @@ def communicate_via_ssh(host, sys_args, tty, data_out=None):
     arguments = ' '.join(sys_args[1:])
     arguments = '\' {}\''.format(arguments)
     command = ssh_call + arguments
-    print(command)
-    sys.exit()
+    
     process = subprocess.Popen(command, shell=True, stdout=stdout, stderr=stderr)
     stdout, stderr = process.communicate()
 
@@ -695,6 +694,4 @@ def run(args, verbosity):
 
         table = Table(atoms_it)
         table.print_keys_table()
-            
-main()
 

@@ -48,7 +48,7 @@ NOTE: It is possible that the top level setup.py script will install a fresh ase
 
 ### Allowing access to your databases from the outside
 This section assumes that you have already installed the backend (see previous section for instructions how to do it). To allow remote access, you will need a separate user on your Unix machine (say, "abcd"). In the ```~/.ssh/authorized_keys``` file you should put a public key of a person you want to grant access to. Each line should be in the following format:
->command="abcd ${SSH\_ORIGINAL\_COMMAND} --ssh --user USER" ssh-rsa AAAAB3NzaC1y...QoJjD3eACfT user@email.com  
+>command="source ~/.bash_profile && abcd ${SSH\_ORIGINAL\_COMMAND} --ssh --user USER" ssh-rsa AAAAB3NzaC1y...QoJjD3eACfT user@email.com  
 
 Where "USER" should be substituted for the name of the owner of the key. Each time this key is used to log into this computer, the script abcd is executed with user-specified arguments and additional arguments: --user USER and --ssh.
 
