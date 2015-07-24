@@ -4,7 +4,6 @@
 
 * Move arguments around in the ssh config file
 * Remove the ssh setup instructions from the README
-* Rename cli.py to something more sensible
 * Allow a read-only access
 * Ability to update configurations (check out, do some calculations, update the database). For this the ids need to be sorted out (configurations can be identified by their unique_id keys).
 * James: asedb-patch functionality should move to abcd. special properties that are stored in named asedb properties: number of atoms, cell, pbc, unique_id, ctime, mtime, user, positions, numbers

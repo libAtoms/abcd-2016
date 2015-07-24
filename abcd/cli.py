@@ -35,16 +35,16 @@ if backend_enabled:
 description = ''
 
 examples = '''
-    cli.py --remote abcd@gc121mac1 db1.db --show   (display the database)
-    cli.py --remote abcd@gc121mac1 db1.db   (display information about available keys)
-    cli.py --remote abcd@gc121mac1 db1.db \'energy<0.6 id>4 id<20 id!=10,11,12 elements~C elements~H,F,Cl\'   (querying)
-    cli.py --remote abcd@gc121mac1 db1.db --extract-original-files --path-prefix extracted/   (extract original files to the extracted/ folder)
-    cli.py --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
-    cli.py db1.db \'energy>0.7\' --count   (count number of selected rows)
-    cli.py db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
-    cli.py db1.db --store conf1.xyz conf2.xyz info.txt   (store original files in the database)
-    cli.py db1.db --store configs/   (store the whole directory in the database)
-    cli.py db1.db --omit-keys 'user,id' --show  (omit keys)
+    abcd --remote abcd@gc121mac1 db1.db --show   (display the database)
+    abcd --remote abcd@gc121mac1 db1.db   (display information about available keys)
+    abcd --remote abcd@gc121mac1 db1.db \'energy<0.6 id>4 id<20 id!=10,11,12 elements~C elements~H,F,Cl\'   (querying)
+    abcd --remote abcd@gc121mac1 db1.db --extract-original-files --path-prefix extracted/   (extract original files to the extracted/ folder)
+    abcd --remote abcd@gc121mac1 db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
+    abcd db1.db \'energy>0.7\' --count   (count number of selected rows)
+    abcd db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
+    abcd db1.db --store conf1.xyz conf2.xyz info.txt   (store original files in the database)
+    abcd db1.db --store configs/   (store the whole directory in the database)
+    abcd db1.db --omit-keys 'user,id' --show  (omit keys)
 '''
 
 def main(args = sys.argv[1:]):
@@ -145,7 +145,8 @@ def communicate_via_ssh(host, sys_args, tty, data_out=None):
     arguments = ' '.join(sys_args[1:])
     arguments = '\' {}\''.format(arguments)
     command = ssh_call + arguments
-
+    print(command)
+    sys.exit()
     process = subprocess.Popen(command, shell=True, stdout=stdout, stderr=stderr)
     stdout, stderr = process.communicate()
 
