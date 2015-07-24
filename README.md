@@ -47,12 +47,11 @@ No install is needed when the script is to be run only remotely. To use it local
 NOTE: It is possible that the top level setup.py script will install a fresh ase package even if one already exists (this is a bug which will hopefully soon be fixed). The new ase package will not be patched, so the script might not work properly. If this happens, you will either have to patch the new version or remove it so that only the old one is present. To test if your version of ase is patched, run ```ase-db --help```. If it has options -x and -W, you are using the patched version. 
 
 ### Allowing access to your databases from the outside
-This section assumes that you have already installed the backend (see previous section for instructions how to do it). To allow remote access, you will need a separate user on your Unix machine (say, "abcd"). In the ```~/.ssh/authorized_keys``` file you should put a public key of a person you want to grant access to. Each line should be in the following format:
->command="source ~/.bash_profile && abcd ${SSH\_ORIGINAL\_COMMAND} --ssh --user USER" ssh-rsa AAAAB3NzaC1y...QoJjD3eACfT user@email.com  
+This section assumes that you have already installed the backend (see previous section for instructions how to do it). To allow remote access, you will need a separate user on your Unix machine (say, "abcd").
 
-Where "USER" should be substituted for the name of the owner of the key. Each time this key is used to log into this computer, the script abcd is executed with user-specified arguments and additional arguments: --user USER and --ssh.
-
-In the future, adding users to the authorised_keys file will handled be a script.
+To allow access for the user USER, execute asedb_sqlite3_backend.py script (which is found under "abcd/backends/asedb_sqlite3/asedb_sqlite3_backend/") in the following way:  
+```python asedb_sqlite3_backend.py --add-user USER```  
+You will then be asked for the public ssh key of this USER.
 
 In case of the ASEdb backend, all your databases are stored in the $databases/all/ directory. If you run the script locally, you have full access to the all/ directory. If you want to give someone access to your files, you should create a directory with their name (which should be the same as in the *authorized_keys* file) and in it symlinks to corresponding files under $databases/all. If the user queries your machine remotely, they will have access only to files in their folder.
 

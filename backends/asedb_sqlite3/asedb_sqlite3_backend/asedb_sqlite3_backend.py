@@ -15,9 +15,26 @@ import glob
 import time
 
 CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
+AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
 FILE_NAME = os.path.basename(__file__)
 if FILE_NAME.endswith('.pyc'):
     FILE_NAME = FILE_NAME[:-1]
+
+def get_dbs_path():
+    dbs_path = None
+    parser = SafeConfigParser()
+
+    # Read the config file if it exists
+    if os.path.isfile(CONFIG_PATH):
+        try:
+            parser.read(CONFIG_PATH)
+            dbs_path = parser.get('ase-db', 'dbs_path')
+        except:
+            raise RuntimeError('Could not read {}'.format(CONFIG_PATH))
+    else:
+        cmd = 'python {} --setup'.format(FILE_NAME)
+        raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
+    return dbs_path
 
 def translate_query(conditions):
 
@@ -80,23 +97,6 @@ class ASEdbSQlite3Backend(Backend):
         return func_wrapper
 
     def __init__(self, database=None, user=None, password=None):
-
-        def get_dbs_path():
-            dbs_path = None
-            parser = SafeConfigParser()
-
-            # Read the config file if it exists
-            if os.path.isfile(CONFIG_PATH):
-                try:
-                    parser.read(CONFIG_PATH)
-                    dbs_path = parser.get('ase-db', 'dbs_path')
-                except:
-                    raise RuntimeError('Could not read {}'.format(CONFIG_PATH))
-            else:
-                cmd = 'python {} --setup'.format(FILE_NAME)
-                raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
-            return dbs_path
-
         self.user = user
         self.dbs_path = get_dbs_path()
         self.connection = None
@@ -301,26 +301,46 @@ class ASEdbSQlite3Backend(Backend):
     def is_open(self):
         return True
 
+def add_user(user):
+    dbs_path = get_dbs_path()
+    user_dbs_path = os.path.join(dbs_path, user)
+
+    # Check if this user already exists
+    if os.path.isdir(user_dbs_path):
+        print '  User "{}" already exists'.format(user)
+        return
+    else:
+        # Make a directory for the user
+        os.mkdir(user_dbs_path)
+
+    # Add user's credentials to the authorized_keys file
+    public_key = raw_input('Enter the ssh public key for {}: '.format(user))
+    line = '\ncommand=". ~/.bash_profile && abcd ${{SSH_ORIGINAL_COMMAND}} --ssh --user {}" {}'.format(user, public_key)
+    with open(AUTHORIZED_KEYS, 'a') as f:
+        f.write(line)
+
+    print '  Added a key for user "{}" to {}'.format(user, AUTHORIZED_KEYS)
+    print '  Created {}'.format(user_dbs_path)
+
 def setup():
     '''
     Create a config file and a directory in which databases will be stored.
     '''
-
-    parser = SafeConfigParser()
-    dbs_path = None
-
-    # Config file doesn't exist. Create it
+    # Check if the config file exists
     if not os.path.isfile(CONFIG_PATH):
+        # Ask user for the path to the databases folder
         dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
-        cfg_file = open(CONFIG_PATH,'w')
+
+        # Create the config file
+        parser = SafeConfigParser()
         parser.add_section('ase-db')
         parser.set('ase-db', 'dbs_path', dbs_path)
+        cfg_file = open(CONFIG_PATH,'w')
         parser.write(cfg_file)
         cfg_file.close()
         print '  Created a config file at {}'.format(CONFIG_PATH)
     else:
-        parser.read(CONFIG_PATH)
-        dbs_path = parser.get('ase-db', 'dbs_path')
+        dbs_path = get_dbs_path()
         print '  Config file found at {}'.format(CONFIG_PATH)
 
     # Path to the "all" folder
@@ -339,9 +359,9 @@ if __name__ == '__main__':
     import sys
     args = sys.argv[1:]
 
-    if len(args) != 1:
-        print 'Usage: python asedb_sqlite3_backend.py --setup'
-    elif args[0] == '--setup':
+    if args[0] == '--setup' and len(args) == 1:
         setup()
+    elif args[0] == '--add-user' and len(args) == 2:
+        add_user(args[1])
     else:
-        print 'Unrecognised argument: {}'.format(args[0])
+        print 'Usage: python asedb_sqlite3_backend.py --setup / --add-user USER'
