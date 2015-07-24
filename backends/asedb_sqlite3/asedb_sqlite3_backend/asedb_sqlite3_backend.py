@@ -14,6 +14,11 @@ from random import randint
 import glob
 import time
 
+CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
+FILE_NAME = os.path.basename(__file__)
+if FILE_NAME.endswith('.pyc'):
+    FILE_NAME = FILE_NAME[:-1]
+
 def translate_query(conditions):
 
     # Split conditions with ANDed operands into
@@ -77,22 +82,19 @@ class ASEdbSQlite3Backend(Backend):
     def __init__(self, database=None, user=None, password=None):
 
         def get_dbs_path():
-            config_path = os.path.join(os.environ['HOME'], '.abcd_config')
             dbs_path = None
             parser = SafeConfigParser()
 
-            # Config file doesn't exist. Create it
-            if not os.path.isfile(config_path):
-                dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
-                cfg_file = open(config_path,'w')
-                parser.add_section('ase-db')
-                parser.set('ase-db', 'dbs_path', dbs_path)
-                parser.write(cfg_file)
-                cfg_file.close()
             # Read the config file if it exists
+            if os.path.isfile(CONFIG_PATH):
+                try:
+                    parser.read(CONFIG_PATH)
+                    dbs_path = parser.get('ase-db', 'dbs_path')
+                except:
+                    raise RuntimeError('Could not read {}'.format(CONFIG_PATH))
             else:
-                parser.read(config_path)
-                dbs_path = parser.get('ase-db', 'dbs_path')
+                cmd = 'python {} --setup'.format(FILE_NAME)
+                raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
             return dbs_path
 
         self.user = user
@@ -100,15 +102,11 @@ class ASEdbSQlite3Backend(Backend):
         self.connection = None
         self.root_dir = None
 
-        # Check if the databases directory exists. If not , create it
-        if not os.path.isdir(self.dbs_path):
-            os.mkdir(self.dbs_path)
-            print self.dbs_path, 'was created'
-
-        # Check if the $databases/all directory exists. If not, create it
-        if not os.path.isdir(os.path.join(self.dbs_path, 'all')):
-            os.mkdir(os.path.join(self.dbs_path, 'all'))
-            print os.path.join(self.dbs_path,'all'), 'was created'
+        # Check if the $databases/all directory exists.
+        all_path = os.path.join(self.dbs_path, 'all')
+        if not os.path.isdir(all_path):
+            cmd = 'python {} --setup'.format(FILE_NAME)
+            raise RuntimeError('{} does not exist. Run "{}" first'.format(all_path, cmd))
 
         # Get the user. If the script is running locally, we have access
         # to all databases.
@@ -302,3 +300,48 @@ class ASEdbSQlite3Backend(Backend):
 
     def is_open(self):
         return True
+
+def setup():
+    '''
+    Create a config file and a directory in which databases will be stored.
+    '''
+
+    parser = SafeConfigParser()
+    dbs_path = None
+
+    # Config file doesn't exist. Create it
+    if not os.path.isfile(CONFIG_PATH):
+        dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
+        cfg_file = open(CONFIG_PATH,'w')
+        parser.add_section('ase-db')
+        parser.set('ase-db', 'dbs_path', dbs_path)
+        parser.write(cfg_file)
+        cfg_file.close()
+        print '  Created a config file at {}'.format(CONFIG_PATH)
+    else:
+        parser.read(CONFIG_PATH)
+        dbs_path = parser.get('ase-db', 'dbs_path')
+        print '  Config file found at {}'.format(CONFIG_PATH)
+
+    # Path to the "all" folder
+    all_path = os.path.join(dbs_path, 'all')
+
+     # Check if the "all" directory exists. If not, create it
+    if not os.path.isdir(all_path):
+        os.makedirs(all_path)
+        print '  Created databases directory at {}'.format(dbs_path)
+        print '  Your databases will be stored in {}'.format(all_path)
+    else:
+        print '  Your databases directory already exists at {}'.format(dbs_path)
+        print '  Your databases are stored at {}'.format(all_path)
+
+if __name__ == '__main__':
+    import sys
+    args = sys.argv[1:]
+
+    if len(args) != 1:
+        print 'Usage: python asedb_sqlite3_backend.py --setup'
+    elif args[0] == '--setup':
+        setup()
+    else:
+        print 'Unrecognised argument: {}'.format(args[0])

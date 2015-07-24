@@ -42,7 +42,8 @@ No install is needed when the script is to be run only remotely. To use it local
 
 - Run ```python setup.py install --user``` in the top directory to install the abcd package
 - Install the backend by running its corresponding setup script in the same way
-- Run the cli.py script and specify the path to the databases directory
+- If using the ASEdb backend, run the setup by executing "python asedb_sqlite3_backend.py --setup". asedb_sqlite3_backend.py can be found under "abcd/backends/asedb_sqlite3/asedb_sqlite3_backend/"
+- The cli.py script is now ready to be used
 
 ### Allowing access to your databases from the outside
 You will need a separate user on your Unix machine (say, "abcd"). In the ```~/.ssh/authorized_keys``` file you should put a public key of a person you want to grant access to. Each line should be in the following format:
