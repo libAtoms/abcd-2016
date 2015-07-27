@@ -33,7 +33,7 @@ class Table(object):
         else:
             return str
 
-    def _format_value(self, key, value, max_len, force=False):
+    def _format_value(self, key, value, max_len):
         if key == 'c_time' or key == 'm_time':
             value = time.strftime('%d%b%y %H:%M', time.localtime(value))
             max_len = 13
@@ -41,7 +41,7 @@ class Table(object):
             max_len = 15
         return self._trim(str(value), max_len)
 
-    def print_rows(self):
+    def print_rows(self, border=True, truncate=True):
         keys_list = self.keys_union()
 
         # Reorder the list
@@ -52,8 +52,26 @@ class Table(object):
             if key in keys_list:
                 keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
+        # Overwrite "truncate" if "border" is False
+        if not border:
+            truncate = False
+
+        if truncate:
+            max_title_len = 10
+            max_cell_len = 6
+        else:
+            max_title_len = 16
+            max_cell_len = 16
         t = PrettyTable([self._trim(key, 10) for key in keys_list if key not in self.skip_cols])
-        t.padding_width = 0
+
+        if border:
+            t.padding_width = 0
+            t.border = True
+        else:
+            t.padding_width = 1
+            t.border = False
+            t.align = 'l'
+
         no_rows = 0
         for dct in self.dicts:
             lst = []
@@ -61,7 +79,7 @@ class Table(object):
                 if key in self.skip_cols:
                     continue
                 if key in dct:
-                    value = self._format_value(key, dct[key], 6)
+                    value = self._format_value(key, dct[key], max_cell_len)
                 else:
                     value = '-'
                 lst.append(value)
@@ -69,10 +87,15 @@ class Table(object):
             no_rows += 1
 
         s = ''
+        if not border:
+            comment = '#'
+        else:
+            comment = ''
+
         if no_rows > 0:
-            s += t.get_string()
-            s += '\n  Not displaying: {}\n'.format(self.skip_cols)
-        s += '  Rows: {}'.format(no_rows)
+            s += comment + t.get_string()
+            s += '\n' + comment + '  Not displaying: {}\n'.format(self.skip_cols)
+        s += comment + '  Rows: {}'.format(no_rows)
         print s
 
     def values_range(self, key):

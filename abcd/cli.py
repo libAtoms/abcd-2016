@@ -71,6 +71,7 @@ def main(args = sys.argv[1:]):
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
     add('--show', action='store_true', help='Show the database')
+    add('--no-pretty', action='store_true', help='Don\'t use pretty tables')
     add('--limit', type=int, default=0, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
@@ -669,7 +670,12 @@ def run(args, verbosity):
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         table = Table(atoms_it)
-        table.print_rows()
+
+        if keys != '++':
+            truncate = False
+        else:
+            truncate = True
+        table.print_rows(border=not args.no_pretty, truncate=truncate)
 
     elif ssh and local:
         communicate_via_ssh(args.remote, sys.argv, tty=True)
