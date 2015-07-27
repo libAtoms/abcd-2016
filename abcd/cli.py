@@ -28,7 +28,7 @@ if backend_enabled:
     from authentication import Credentials
     from query import QueryTranslator
     from table import Table
-    from util import atoms2plaindict, plaindict2atoms
+    from util import atoms2dict, dict2atoms
     import json
     from base64 import b64encode, b64decode
 
@@ -472,7 +472,7 @@ def run(args, verbosity):
         data_in = json.loads(b64decode(sys.stdin.read()))
 
         for dct in data_in[0]:
-            dct['atoms'] = plaindict2atoms(dct['atoms'])
+            dct['atoms'] = dict2atoms(dct['atoms'], plain_arrays=True)
 
         parsed = data_in[0]
         aux_files = data_in[1]
@@ -588,7 +588,7 @@ def run(args, verbosity):
             # Convert the atoms objects to dictionaries
             data_out = [parsed, aux_files]
             for dct in data_out[0]:
-                dct['atoms'] = atoms2plaindict(dct['atoms'])
+                dct['atoms'] = atoms2dict(dct['atoms'], plain_arrays=True)
 
             # Serialise the data and send it to remote
             data_string = json.dumps(data_out)

@@ -2,6 +2,7 @@ from abcd.backend import Backend
 import abcd.backend
 import abcd.results as results
 from abcd.query import Condition, And
+from abcd.util import get_info_and_arrays
 
 from ase.db import connect
 from ase.utils import plural
@@ -13,6 +14,7 @@ from itertools import imap, product
 from random import randint
 import glob
 import time
+import numpy as np
 
 CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
 AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
@@ -215,7 +217,9 @@ class ASEdbSQlite3Backend(Backend):
                 atoms.info['formula'] = atoms.get_chemical_formula()
                 atoms.info['n_atoms'] = len(atoms.numbers)
 
-                self.connection.write(atoms=atoms, key_value_pairs=kvp, add_from_info_and_arrays=True)
+                info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
+
+                self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
                 inserted_ids.append(uid)
             else:
                 skipped_ids.append(uid)
@@ -262,7 +266,23 @@ class ASEdbSQlite3Backend(Backend):
         rows_iter = self._select(filter, sort=sort, reverse=reverse, limit=limit)
 
         def row2atoms(row):
-            atoms = row.toatoms(add_to_info_and_arrays=True)
+            atoms = row.toatoms()
+
+            # Add additional info
+            atoms.info['unique_id'] = row.unique_id
+            if row._keys:
+                atoms.info.update(row.key_value_pairs)
+            data = row.get('data')
+            if data:
+                for (key, value) in data.items():
+                    key = str(key) # avoid unicode strings
+                    value = np.array(value)
+                    if value.dtype.kind == 'U':
+                        value = value.astype(str)
+                    try:
+                        atoms.new_array(key, value)
+                    except (TypeError, ValueError):
+                        atoms.info[key] = value
 
             keys_to_delete = ['unique_id']
             if keys != '++':

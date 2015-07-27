@@ -5,7 +5,34 @@ from ase.atoms import Atoms
 from ase.calculators.calculator import get_calculator, all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
 
-def atoms2plaindict(atoms):
+def get_info_and_arrays(atoms, plain_arrays):
+    info = {}
+    arrays = {}
+    for (key, value) in atoms.info.items():
+        key = key.lower()
+        if (isinstance(value, int) or isinstance(value, basestring) or
+                isinstance(value, float) or isinstance(value, bool)):
+            # Scalars
+            info[key] = value
+        else:
+            # More complicated data structures
+            arrays[key] = value
+
+    skip_arrays = ['numbers', 'positions', 'species']
+    for (key, value) in atoms.arrays.iteritems():
+        if key in skip_arrays:
+            continue
+        key = key.lower()
+        arrays[key] = value
+
+    if plain_arrays:
+        for key, value in arrays.iteritems():
+            if value.__class__ == np.ndarray:
+                arrays[key] = value.tolist()
+
+    return info, arrays
+
+def atoms2dict(atoms, plain_arrays):
     dct = {
         'numbers': atoms.numbers,
         'pbc': atoms.pbc,
@@ -25,39 +52,21 @@ def atoms2plaindict(atoms):
         dct['constraints'] = [c.todict() for c in atoms.constraints]
     if atoms.calc is not None:
         dct['calculator'] = atoms.calc.name.lower()
-        dct['calculator_parameters'] = atoms.calc.todict()
+        dct['calculator_parameters'] = atoms.calc
         if len(atoms.calc.check_state(atoms)) == 0:
             dct.update(atoms.calc.results)
 
-    for key, value in dct.iteritems():
-        if value.__class__ == np.ndarray:
-            dct[key] = value.tolist()
+    if plain_arrays:
+        for key, value in dct.iteritems():
+            if value.__class__ == np.ndarray:
+                dct[key] = value.tolist()
 
-    info = dct['info'] = {}
-    arrays = dct['arrays'] = {}
-    for (key, value) in atoms.info.items():
-        key = key.lower()
-        if (isinstance(value, int) or isinstance(value, basestring) or
-                isinstance(value, float) or isinstance(value, bool)):
-            # Scalars
-            info[key] = value
-        else:
-            # More complicated data structures
-            arrays[key] = value
-
-    skip_arrays = ['numbers', 'positions', 'species']
-    for (key, value) in atoms.arrays.iteritems():
-        if key in skip_arrays:
-            continue
-        key = key.lower()
-        arrays[key] = value
-
-    for key, value in dct['arrays'].iteritems():
-        if value.__class__ == np.ndarray:
-            dct['arrays'][key] = value.tolist() 
+    info, arrays = get_info_and_arrays(atoms, plain_arrays)
+    dct['info'] = info
+    dct['arrays'] = arrays
     return dct
 
-def plaindict2atoms(dct):
+def dict2atoms(dct, plain_arrays):
 
     def get_val(dct, key, default=None):
         if key in dct:
@@ -88,7 +97,8 @@ def plaindict2atoms(dct):
     if 'arrays' in dct:
         for key, value in dct['arrays'].iteritems():
             key = str(key) # avoid unicode strings
-            value = np.array(value)
+            if plain_arrays:
+                value = np.array(value)
             if value.dtype.kind == 'U':
                 value = value.astype(str)
             try:

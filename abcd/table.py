@@ -1,6 +1,6 @@
 __author__ = 'Patrick Szmucer'
 
-from util import atoms2plaindict
+from util import atoms2dict
 from ase.utils import hill
 from prettytable import PrettyTable
 import time
@@ -15,7 +15,7 @@ class Table(object):
     def __init__(self, atoms_it):
         self.dicts = []
         for atoms in atoms_it:
-            old_dict = atoms2plaindict(atoms)
+            old_dict = atoms2dict(atoms, plain_arrays=True)
             
             new_dict = dict(old_dict)
             new_dict.pop('info', None)
