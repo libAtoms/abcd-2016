@@ -39,12 +39,12 @@ Note that if a query contains "<" or ">" it needs to be enclosed in quotes.
 
 No install is needed when the script is to be run only remotely. To use it locally:
 
-- Run ```python setup.py install --user``` in the top directory to install the abcd package. It will install the abcd tool on your system.
-- Install the backend by running its corresponding setup script in the same way
-- If using the ASEdb backend, run the additional setup by executing "python asedb_sqlite3_backend.py --setup". asedb_sqlite3_backend.py can be found under "abcd/backends/asedb_sqlite3/asedb_sqlite3_backend/".
+- Change the directory to *abcd/*
+- Run ```python setup.py install --user``` to install the abcd package. It will install the abcd tool on your system. It will also install a fresh version ASE.
+- Patch the fresh ASE with with the patch found in the *patch/* directory. Example: ```cd path/to/ASE && patch -p0 < $abcd/patch/ase-db-all-data.patch```
+- Install the backend by running its corresponding setup script in the same way. For example, if installing the ASEdb backend: ```python backends/asedb_sqlite3/setup.py install --user```
+- If using the ASEdb backend, run the additional setup by executing ```python backends/asedb_sqlite3/asedb_sqlite3_backend/asedb_sqlite3_backend.py --setup```.
 - The script is now ready to be used. To use it, just call ```abcd```
-
-NOTE: It is possible that the top level setup.py script will install a fresh ase package even if one already exists (this is a bug which will hopefully soon be fixed). The new ase package will not be patched, so the script might not work properly. If this happens, you will either have to patch the new version or remove it so that only the old one is present. To test if your version of ase is patched, run ```ase-db --help```. If it has options -x and -W, you are using the patched version. 
 
 ### Allowing access to your databases from the outside
 This section assumes that you have already installed the backend (see previous section for instructions how to do it). To allow remote access, you will need a separate user on your Unix machine (say, "abcd").
