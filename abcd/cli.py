@@ -50,7 +50,7 @@ examples = '''
 def main(args = sys.argv[1:]):
     if isinstance(args, str):
         args = args.split(' ')
-    parser = argparse.ArgumentParser(usage = 'Usage: %%prog [db-name] [selection] [options]',
+    parser = argparse.ArgumentParser(usage = 'Usage: abcd [db-name] [selection] [options]',
                         description = description,
                         epilog = 'Examples: ' + examples,
                         formatter_class=argparse.RawTextHelpFormatter)
@@ -58,7 +58,6 @@ def main(args = sys.argv[1:]):
     # Display usage if no arguments are supplied
     if len(sys.argv)==1:
         parser.print_usage()
-        sys.exit(1)
 
     add = parser.add_argument
     add('database', nargs='?', help = 'Specify the database')
@@ -230,27 +229,6 @@ def run(args, verbosity):
             ssh = True
         else:
             ssh = False
-
-    # List all available databases
-    if args.list and ssh and local:
-        communicate_via_ssh(args.remote, sys.argv, tty=True)
-        return
-
-    elif args.list:
-        box, token = init_backend(args.database, args.user)
-
-        dbs = box.list(token)
-        if args.user:
-            user = args.user
-        else:
-            user = 'Local User'
-        if dbs:
-            print(('Hello, {}. Databases you have access to:').format(user))
-            for db in dbs:
-                print('   {}'.format(db))
-        else:
-            print(('Hello, {}. You don\'t have access to any databases.').format(user))
-        return
 
     # Get the query
     q = QueryTranslator(*args.query)
@@ -663,6 +641,19 @@ def run(args, verbosity):
     elif args.show and ssh and local:
         communicate_via_ssh(args.remote, sys.argv, tty=True)
 
+    
+
+    elif ssh and local:
+        communicate_via_ssh(args.remote, sys.argv, tty=True)
+
+    elif args.ids:
+        box, token = init_backend(args.database, args.user)
+        atoms_it = box.find(auth_token=token, filter=query, 
+                            sort=args.sort, reverse=args.reverse,
+                            limit=args.limit, keys=keys, omit_keys=omit_keys)
+        for atoms in atoms_it:
+            print(atoms.info['uid'])
+
     # Show the database
     elif args.show:
         box, token = init_backend(args.database, args.user)
@@ -677,19 +668,26 @@ def run(args, verbosity):
             truncate = True
         table.print_rows(border=not args.no_pretty, truncate=truncate)
 
-    elif ssh and local:
+    # List all available databases
+    elif (args.list or not args.database) and ssh and local:
         communicate_via_ssh(args.remote, sys.argv, tty=True)
+        return
 
-    elif not args.database:
-        to_stderr('No database specified')
-
-    elif args.ids:
+    elif args.list or not args.database:
         box, token = init_backend(args.database, args.user)
-        atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, reverse=args.reverse,
-                            limit=args.limit, keys=keys, omit_keys=omit_keys)
-        for atoms in atoms_it:
-            print(atoms.info['uid'])
+
+        dbs = box.list(token)
+        if args.user:
+            user = args.user
+        else:
+            user = 'Local User'
+        if dbs:
+            print(('Hello, {}. Databases you have access to:').format(user))
+            for db in dbs:
+                print('   {}'.format(db))
+        else:
+            print(('Hello, {}. You don\'t have access to any databases.').format(user))
+        return
 
     # Print info about keys
     else:
