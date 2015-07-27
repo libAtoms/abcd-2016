@@ -11,7 +11,7 @@ setup(
     author='Patrick Szmucer',
     author_email='pjs87@cam.ac.uk',
     version='0.0.0',
-    install_requires=['abcd', 'ase'],
+    install_requires=['abcd'],
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 2.7",
