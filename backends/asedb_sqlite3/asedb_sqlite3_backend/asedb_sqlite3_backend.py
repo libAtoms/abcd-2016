@@ -7,6 +7,8 @@ from abcd.util import get_info_and_arrays
 from ase.db import connect
 from ase.utils import plural
 from ase.atoms import Atoms
+from ase.calculators.calculator import get_calculator, all_properties
+from ase.calculators.singlepoint import SinglePointCalculator
 
 import os
 from ConfigParser import SafeConfigParser
@@ -188,6 +190,31 @@ class ASEdbSQlite3Backend(Backend):
     @require_database
     def insert(self, auth_token, atoms, kvp):
 
+        def preprocess(atoms):
+            '''
+            Load capitalised special key-value pairs into
+            a calcuator.
+            '''
+            results = {}
+
+            for key in atoms.info.keys():
+                if key.lower() in all_properties:
+                    results[key.lower()] = atoms.info[key]
+                    del atoms.info[key]
+            for key in atoms.arrays.keys():
+                if key.lower() in all_properties:
+                    results[key.lower()] = atoms.arrays[key]
+                    del atoms.arrays[key]
+
+            if results != {}:
+                if atoms.calc is None:
+                    # Create a new calculator
+                    calculator = SinglePointCalculator(atoms, **results)
+                    atoms.set_calculator(calculator)
+                else:
+                    # Use the existing calculator
+                    atoms.calc.results.update(results)
+
         def insert_atoms(atoms, inserted_ids, skipped_ids):
             atoms.info.pop('id', None)
 
@@ -217,8 +244,8 @@ class ASEdbSQlite3Backend(Backend):
                 atoms.info['formula'] = atoms.get_chemical_formula()
                 atoms.info['n_atoms'] = len(atoms.numbers)
 
+                preprocess(atoms)
                 info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
-
                 self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
                 inserted_ids.append(uid)
             else:
