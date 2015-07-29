@@ -4,6 +4,7 @@ from util import atoms2dict
 from ase.utils import hill
 from prettytable import PrettyTable
 import time
+from collections import Counter
 
 class Table(object):
     '''
@@ -42,7 +43,10 @@ class Table(object):
         return self._trim(str(value), max_len)
 
     def print_rows(self, border=True, truncate=True):
-        keys_list = self.keys_union()
+        keys = set()
+        for dct in self.dicts:
+            keys = keys | set(dct.keys())
+        keys_list = list(keys)
 
         # Reorder the list
         order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'config_type', 'calculator', 
@@ -112,48 +116,37 @@ class Table(object):
                 ret = ('?', '?')
             return ret
 
-    def keys_union(self):
-        keys = set()
-        for dct in self.dicts:
-            for key in dct:
-                keys.add(key)
-        return sorted(list(keys))
-
-    def keys_intersection(self):
-        if self.dicts:
-            keys = set(list(self.dicts[0].keys()))
-        else:
-            return set()
-        for dct in self.dicts[1:]:
-            new_keys = set()
-            for key in dct:
-                new_keys.add(key)
-            keys = keys & new_keys
-        return sorted(list(keys))
-
     def print_keys_table(self):
-        union = self.keys_union()
-        intersection = self.keys_intersection()
+        if not self.dicts:
+            print 'Database is empty'
+            return
+
+        print '\nROWS:', len(self.dicts)
+        
+        union = set()
+        intersection = set(self.dicts[0].keys())
+        counter = Counter()
+        for dct in self.dicts:
+            keys = set(dct.keys())
+            counter.update(keys)
+            union = union | keys
+            intersection = intersection & keys
+        intersection = sorted(list(intersection))
+        union = sorted(list(union))
+
         ranges = {key: self.values_range(key) for key in union}
 
-        t_intersection = PrettyTable(['Key', 'Min', 'Max'])
-        t_intersection.padding_width = 0
-        t_intersection.align["Key"] = "l"
+        def print_table(lst, title):
+            t = PrettyTable(['Key', 'Min', 'Max'])
+            t.padding_width = 0
+            t.align['Key'] = 'l'
+            print '\n', title
+            for key in lst:
+                k = '{} ({})'.format(self._trim(key, 25), str(counter[key]))
+                row = [k, self._format_value(key, ranges[key][0], 18), 
+                            self._format_value(key, ranges[key][1], 18)]
+                t.add_row(row)
+            print t
 
-        print '\nINTERSECTION:'
-        for key in intersection:
-            row = [key, self._format_value(key, ranges[key][0], 18), 
-                        self._format_value(key, ranges[key][1], 18)]
-            t_intersection.add_row(row)
-        print t_intersection
-
-        t_union = PrettyTable(['Key', 'Min', 'Max'])
-        t_union.padding_width = 0
-        t_union.align["Key"] = "l"
-
-        print '\nUNION:'
-        for key in union:
-            row = [key, self._format_value(key, ranges[key][0], 18), 
-                        self._format_value(key, ranges[key][1], 18)]
-            t_union.add_row(row)
-        print t_union
+        print_table(intersection, 'INTERSECTION')
+        print_table(union, 'UNION')
