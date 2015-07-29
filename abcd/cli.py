@@ -27,7 +27,7 @@ if backend_enabled:
     from structurebox import StructureBox
     from authentication import Credentials
     from query import QueryTranslator
-    from table import Table
+    from table import print_keys_table, print_rows
     from util import atoms2dict, dict2atoms
     import json
     from base64 import b64encode, b64decode
@@ -660,13 +660,12 @@ def run(args, verbosity):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
-        table = Table(atoms_it)
 
         if keys != '++':
             truncate = False
         else:
             truncate = True
-        table.print_rows(border=not args.no_pretty, truncate=truncate)
+        print_rows(atoms_it, border=not args.no_pretty, truncate=truncate)
 
     # List all available databases
     elif (args.list or not args.database) and ssh and local:
@@ -695,7 +694,5 @@ def run(args, verbosity):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
-
-        table = Table(atoms_it)
-        table.print_keys_table()
+        print_keys_table(atoms_it)
 

@@ -4,149 +4,161 @@ from util import atoms2dict
 from ase.utils import hill
 from prettytable import PrettyTable
 import time
-from collections import Counter
+import collections
+from numpy import linalg as LA
+import numpy as np
 
-class Table(object):
-    '''
-    Class that holds a list of dictionaries (created from the Atoms object).
-    '''
+def trim(val, length):
+    s = str(val)
+    if len(s) > length+1:
+        return (s[:length] + '..')
+    else:
+        return s
 
-    skip_cols = ['positions', 'forces', 'pbc', 'numbers', 'cell', 'stress', 'm_time']
+def atoms_list2dict(atoms_it):
+    dicts = []
+    for atoms in atoms_it:
+        dct = atoms2dict(atoms, plain_arrays=True)
+        if 'info' in dct and dct['info']:
+            for key, value in dct['info'].iteritems():
+                dct[key] = dct['info'][key]
+        if 'arrays' in dct and dct['arrays']:
+            for key, value in dct['arrays'].iteritems():
+                dct[key] = dct['arrays'][key]
+        dct.pop('info', None)
+        dct.pop('arrays', None)
+        dicts.append(dct)
+    return dicts
 
-    def __init__(self, atoms_it):
-        self.dicts = []
-        for atoms in atoms_it:
-            old_dict = atoms2dict(atoms, plain_arrays=True)
-            
-            new_dict = dict(old_dict)
-            new_dict.pop('info', None)
-            new_dict.pop('arrays', None)
-
-            if old_dict['info']:
-                for key, value in old_dict['info'].iteritems():
-                    new_dict[key] = old_dict['info'][key]
-
-            self.dicts.append(new_dict)
-
-    def _trim(self, str, length):
-        if len(str) > length:
-            return (str[:length] + '..')
+def format_value(value, key):
+    v = value
+    if key == 'c_time' or key == 'm_time':
+        v = time.strftime('%d%b%y %H:%M', time.localtime(value))
+    elif key == 'pbc':
+        if isinstance(v, collections.Container):
+            v = ''
+            for a in value:
+                v += 'T' if a else 'F'
         else:
-            return str
+            v += 'T' if value else 'F'
+    return v
 
-    def _format_value(self, key, value, max_len):
-        if key == 'c_time' or key == 'm_time':
-            value = time.strftime('%d%b%y %H:%M', time.localtime(value))
-            max_len = 13
-        elif key == 'uid':
-            max_len = 15
-        return self._trim(str(value), max_len)
+def print_rows(atoms_list, border=True, truncate=True):
+    dicts = atoms_list2dict(atoms_list)
+    keys = set()
+    for dct in dicts:
+        keys = keys | set(dct.keys())
+    keys_list = list(keys)
 
-    def print_rows(self, border=True, truncate=True):
-        keys = set()
-        for dct in self.dicts:
-            keys = keys | set(dct.keys())
-        keys_list = list(keys)
+    # Reorder the list
+    order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'numbers',
+            'config_type', 'pbc', 'positions', 'cell', 'stress', 'forces',
+            'energy', 'calculator', 'calculator_parameters']
+    for key in reversed(order):
+        if key in keys_list:
+            keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
-        # Reorder the list
-        order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'config_type', 'calculator', 
-                    'calculator_parameters', 'positions', 'energy', 'stress', 
-                    'forces', 'pbc', 'numbers']
-        for key in reversed(order):
-            if key in keys_list:
-                keys_list.insert(0, keys_list.pop(keys_list.index(key)))
+    # Overwrite "truncate" if "border" is False
+    if not border:
+        truncate = False
+    if truncate:
+        max_title_len = 10
+        max_cell_len = 8
+    else:
+        max_title_len = 16
+        max_cell_len = 16
 
-        # Overwrite "truncate" if "border" is False
-        if not border:
-            truncate = False
-
-        if truncate:
-            max_title_len = 10
-            max_cell_len = 6
+    # Initialise the table
+    skip_cols = ['numbers', 'm_time', 'original_file_contents']
+    t = PrettyTable([trim(key, max_title_len) for key in keys_list if key not in skip_cols])
+    if border:
+        t.padding_width = 0
+        t.border = True
+    else:
+        t.padding_width = 1
+        t.border = False
+        t.align = 'l'
+    
+    cell_sizes = {}
+    for key in keys_list:
+        if key == 'uid':
+            cell_sizes[key] = 16
+        elif key in ['c_time', 'm_time']:
+            cell_sizes[key] = 13
         else:
-            max_title_len = 16
-            max_cell_len = 16
-        t = PrettyTable([self._trim(key, 10) for key in keys_list if key not in self.skip_cols])
+            cell_sizes[key] = max_cell_len
 
-        if border:
-            t.padding_width = 0
-            t.border = True
-        else:
-            t.padding_width = 1
-            t.border = False
-            t.align = 'l'
+    # Populate the table with rows
+    no_rows = 0
+    not_displaying = set()
+    for dct in dicts:
+        lst = []
+        for key in keys_list:
+            if key in skip_cols:
+                not_displaying.add(key)
+                continue
+            if key in dct:
+                value = format_value(dct[key], key)
+                value = trim(value, cell_sizes[key])
+            else:
+                value = '-'
+            lst.append(value)
+        t.add_row(lst)
+        no_rows += 1
 
-        no_rows = 0
-        for dct in self.dicts:
-            lst = []
-            for key in keys_list:
-                if key in self.skip_cols:
-                    continue
-                if key in dct:
-                    value = self._format_value(key, dct[key], max_cell_len)
-                else:
-                    value = '-'
-                lst.append(value)
-            t.add_row(lst)
-            no_rows += 1
+    # Print the table
+    s = ''
+    if not border:
+        comment = '#'
+    else:
+        comment = ''
 
-        s = ''
-        if not border:
-            comment = '#'
-        else:
-            comment = ''
+    if no_rows > 0:
+        s += comment + t.get_string()
+        s += '\n' + comment + '  Not displaying: {}\n'.format(list(not_displaying))
+    s += comment + '  Rows: {}'.format(no_rows)
+    print s
 
-        if no_rows > 0:
-            s += comment + t.get_string()
-            s += '\n' + comment + '  Not displaying: {}\n'.format(self.skip_cols)
-        s += comment + '  Rows: {}'.format(no_rows)
-        print s
+def print_keys_table(atoms_list):
 
-    def values_range(self, key):
+    dicts = atoms_list2dict(atoms_list)
+
+    union = set()
+    intersection = set(dicts[0].keys())
+    counter = collections.Counter()
+    for dct in dicts:
+        keys = set(dct.keys())
+        counter.update(keys)
+        union = union | keys
+        intersection = intersection & keys
+    intersection = sorted(list(intersection))
+    union = sorted(list(union))
+
+    ranges = {}
+    for key in union:
+        # Find the minimum for this key
         values = []
-        for dct in self.dicts:
+        for dct in dicts:
             if key in dct:
                 values.append(dct[key])
-        if not values:
-            return None
-        else:
-            try:
-                ret = (min(values), max(values))
-            except:
-                ret = ('?', '?')
-            return ret
+        try:
+            rang = (min(values), max(values))
+        except:
+            rang = ('...', '...')
+        ranges[key] = rang
 
-    def print_keys_table(self):
-        if not self.dicts:
-            print 'Database is empty'
-            return
+    def print_table(lst, title):
+        t = PrettyTable(['Key', 'Min', 'Max'])
+        t.padding_width = 0
+        t.align['Key'] = 'l'
+        print '\n', title
+        for key in lst:
+            k = '{} ({})'.format(trim(key, 25), str(counter[key]))
+            row = [k, trim(ranges[key][0], 18),
+                        trim(ranges[key][1], 18)]
+            t.add_row(row)
+        print t
 
-        print '\nROWS:', len(self.dicts)
-        
-        union = set()
-        intersection = set(self.dicts[0].keys())
-        counter = Counter()
-        for dct in self.dicts:
-            keys = set(dct.keys())
-            counter.update(keys)
-            union = union | keys
-            intersection = intersection & keys
-        intersection = sorted(list(intersection))
-        union = sorted(list(union))
-
-        ranges = {key: self.values_range(key) for key in union}
-
-        def print_table(lst, title):
-            t = PrettyTable(['Key', 'Min', 'Max'])
-            t.padding_width = 0
-            t.align['Key'] = 'l'
-            print '\n', title
-            for key in lst:
-                k = '{} ({})'.format(self._trim(key, 25), str(counter[key]))
-                row = [k, self._format_value(key, ranges[key][0], 18), 
-                            self._format_value(key, ranges[key][1], 18)]
-                t.add_row(row)
-            print t
-
-        print_table(intersection, 'INTERSECTION')
-        print_table(union, 'UNION')
+    print '\nROWS:', len(dicts)
+    print_table(intersection, 'INTERSECTION')
+    print_table(union, 'UNION')
