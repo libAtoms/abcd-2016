@@ -52,7 +52,7 @@ def atoms2dict(atoms, plain_arrays):
         dct['constraints'] = [c.todict() for c in atoms.constraints]
     if atoms.calc is not None:
         dct['calculator'] = atoms.calc.name.lower()
-        dct['calculator_parameters'] = atoms.calc
+        dct['calculator_parameters'] = atoms.calc.todict()
         if len(atoms.calc.check_state(atoms)) == 0:
             dct.update(atoms.calc.results)
 
