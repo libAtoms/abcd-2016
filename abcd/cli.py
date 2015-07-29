@@ -418,7 +418,7 @@ def run(args, verbosity):
             indices = [i for i, s in enumerate(names) if s == name]
             if len(indices) > 1:
                 for i in indices:
-                    names[i] += '-' + unique_ids[i][-15:]
+                    names[i] += '-' + str(unique_ids[i])[-15:]
 
         extracted_paths = []
 

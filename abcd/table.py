@@ -154,8 +154,10 @@ def print_keys_table(atoms_list):
         print '\n', title
         for key in lst:
             k = '{} ({})'.format(trim(key, 25), str(counter[key]))
-            row = [k, trim(ranges[key][0], 18),
-                        trim(ranges[key][1], 18)]
+            min_val = format_value(ranges[key][0], key)
+            max_val = format_value(ranges[key][1], key)
+            row = [k, trim(min_val, 18),
+                        trim(max_val, 18)]
             t.add_row(row)
         print t
 
