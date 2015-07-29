@@ -40,11 +40,9 @@ Note that if a query contains "<" or ">" it needs to be enclosed in quotes.
 No install is needed when the script is to be run only remotely. To use it locally:
 
 - Download and manually install the development version of ASE from *https://wiki.fysik.dtu.dk/ase/download.html#latest-development-release* (min. version required 3.10.0.4590)
-- Change the directory to *abcd/*
-- Run ```python setup.py install --user``` to install the abcd package. It will install the abcd tool on your system.
-- Patch the fresh ASE with with the patch found in the *patch/* directory. Example: ```cd path/to/ASE && patch -p0 < $abcd/patch/ase-db-all-data.patch```
-- Install the backend by running its corresponding setup script in the same way. For example, if installing the ASEdb backend: ```python backends/asedb_sqlite3/setup.py install --user```
-- If using the ASEdb backend, run the additional setup by executing ```python backends/asedb_sqlite3/asedb_sqlite3_backend/asedb_sqlite3_backend.py --setup```.
+- Change the directory to *abcd/* and run ```python setup.py install --user``` to install the abcd package. It will install the abcd tool on your system.
+- Install the backend by running its corresponding setup script in the same way. For example, if installing the ASEdb backend: ```cd backends/asedb_sqlite3 && python setup.py install --user```
+- If using the ASEdb backend, run the additional setup by executing ```python asedb_sqlite3_backend.py --setup```.
 - The script is now ready to be used. To use it, just call ```abcd```
 
 ### Allowing access to your databases from the outside
