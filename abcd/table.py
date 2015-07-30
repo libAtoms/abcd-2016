@@ -122,6 +122,9 @@ def print_rows(atoms_list, border=True, truncate=True):
 def print_keys_table(atoms_list):
 
     dicts = atoms_list2dict(atoms_list)
+    if len(dicts) == 0:
+        print '\nROWS: 0'
+        return
 
     union = set()
     intersection = set(dicts[0].keys())
