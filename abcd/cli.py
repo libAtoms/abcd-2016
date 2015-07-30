@@ -239,7 +239,10 @@ def run(args, verbosity):
         keys = '++'
     else:
         keys = args.keys.split(',')
+    
     omit_keys = args.omit_keys.split(',')
+    if '' in omit_keys:
+        omit_keys.remove('')
 
     # Get kvp
     kvp = {}
@@ -665,7 +668,8 @@ def run(args, verbosity):
             truncate = False
         else:
             truncate = True
-        print_rows(atoms_it, border=not args.no_pretty, truncate=truncate)
+        print_rows(atoms_it, border=not args.no_pretty, 
+            truncate=truncate, show_keys=keys, omit_keys=omit_keys)
 
     # List all available databases
     elif (args.list or not args.database) and ssh and local:
@@ -694,5 +698,5 @@ def run(args, verbosity):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
-        print_keys_table(atoms_it)
+        print_keys_table(atoms_it, show_keys=keys, omit_keys=omit_keys)
 

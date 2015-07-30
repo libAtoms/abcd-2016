@@ -43,8 +43,20 @@ def format_value(value, key):
             v += 'T' if value else 'F'
     return v
 
-def print_rows(atoms_list, border=True, truncate=True):
+def filter_keys(keys_list, show_keys, omit_keys):
+    new_keys_list = list(keys_list)
+    not_displaying = set()
+    for key in keys_list:
+        if key in omit_keys or (show_keys != '++' and key not in show_keys):
+            new_keys_list.remove(key)
+    return new_keys_list
+
+def print_rows(atoms_list, border=True, truncate=True, show_keys='++', omit_keys=[]):
     dicts = atoms_list2dict(atoms_list)
+    if not dicts:
+        print '  Nothing to display'
+        return
+
     keys = set()
     for dct in dicts:
         keys = keys | set(dct.keys())
@@ -58,6 +70,12 @@ def print_rows(atoms_list, border=True, truncate=True):
         if key in keys_list:
             keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
+    keys_list = filter_keys(keys_list, show_keys, omit_keys)
+
+    if not keys_list:
+        print '  No keys to display'
+        return
+
     # Overwrite "truncate" if "border" is False
     if not border:
         truncate = False
@@ -69,8 +87,10 @@ def print_rows(atoms_list, border=True, truncate=True):
         max_cell_len = 16
 
     # Initialise the table
-    skip_cols = ['numbers', 'm_time', 'original_file_contents']
-    t = PrettyTable([trim(key, max_title_len) for key in keys_list if key not in skip_cols])
+    headers = []
+    for key in keys_list:
+        headers.append(trim(key, max_title_len))
+    t = PrettyTable(headers)
     if border:
         t.padding_width = 0
         t.border = True
@@ -90,13 +110,9 @@ def print_rows(atoms_list, border=True, truncate=True):
 
     # Populate the table with rows
     no_rows = 0
-    not_displaying = set()
     for dct in dicts:
         lst = []
         for key in keys_list:
-            if key in skip_cols:
-                not_displaying.add(key)
-                continue
             if key in dct:
                 value = format_value(dct[key], key)
                 value = trim(value, cell_sizes[key])
@@ -114,16 +130,15 @@ def print_rows(atoms_list, border=True, truncate=True):
         comment = ''
 
     if no_rows > 0:
-        s += comment + t.get_string()
-        s += '\n' + comment + '  Not displaying: {}\n'.format(list(not_displaying))
+        s += comment + t.get_string() + '\n'
     s += comment + '  Rows: {}'.format(no_rows)
     print s
 
-def print_keys_table(atoms_list):
+def print_keys_table(atoms_list, show_keys='++', omit_keys=[]):
 
     dicts = atoms_list2dict(atoms_list)
     if len(dicts) == 0:
-        print '\nROWS: 0'
+        print '  Nothing to display'
         return
 
     union = set()
@@ -136,6 +151,9 @@ def print_keys_table(atoms_list):
         intersection = intersection & keys
     intersection = sorted(list(intersection))
     union = sorted(list(union))
+
+    intersection = filter_keys(intersection, show_keys, omit_keys)
+    union = filter_keys(union, show_keys, omit_keys)
 
     ranges = {}
     for key in union:
@@ -154,7 +172,9 @@ def print_keys_table(atoms_list):
         t = PrettyTable(['Key', 'Min', 'Max'])
         t.padding_width = 0
         t.align['Key'] = 'l'
+
         print '\n', title
+        no_keys = 0
         for key in lst:
             k = '{} ({})'.format(trim(key, 25), str(counter[key]))
             min_val = format_value(ranges[key][0], key)
@@ -162,7 +182,12 @@ def print_keys_table(atoms_list):
             row = [k, trim(min_val, 18),
                         trim(max_val, 18)]
             t.add_row(row)
-        print t
+            no_keys += 1
+
+        if no_keys != 0:
+            print t
+        else:
+            print 'No keys to display'
 
     print '\nROWS:', len(dicts)
     print_table(intersection, 'INTERSECTION')
