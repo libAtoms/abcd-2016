@@ -365,7 +365,7 @@ def add_user(user):
 
     # Add user's credentials to the authorized_keys file
     public_key = raw_input('Enter the ssh public key for {}: '.format(user))
-    line = '\ncommand=". ~/.bash_profile && abcd ${{SSH_ORIGINAL_COMMAND}} --ssh --user {}" {}'.format(user, public_key)
+    line = '\ncommand=". ~/.bash_profile && abcd --ssh --user {} ${{SSH_ORIGINAL_COMMAND}}" {}'.format(user, public_key)
     with open(AUTHORIZED_KEYS, 'a') as f:
         f.write(line)
 

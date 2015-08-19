@@ -48,42 +48,71 @@ examples = '''
     abcd db1.db --omit-keys 'user,id' --show  (omit keys)
 '''
 
-def main(args = sys.argv[1:]):
-    if isinstance(args, str):
-        args = args.split(' ')
+def main():
+    sys_args = sys.argv[1:]
+    if isinstance(sys_args, str):
+        sys_args = sys_args.split(' ')
 
-    # Add the options specified in the config file
-    CONFIG_PATH = os.path.expanduser('~/.abcd_config')
+    # Detect if the script is running via ssh and get
+    # the username
+    if '--ssh' in sys_args:
+        # Running on the remote computer
+        local = False
+        ssh = True
+        sys_args.remove('--ssh')
 
-    # Create the config file if it doesn't exist
-    if not os.path.isfile(CONFIG_PATH):
-        cfg_parser = SafeConfigParser()
-        cfg_parser.add_section('abcd')
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            cfg_parser.write(cfg_file)
+        # Get the username
+        if '--user' in sys_args:
+            idx = sys_args.index('--user')
+            user = sys_args[idx + 1]
+            sys_args = sys_args[:idx] + sys_args[idx + 2:]
+        else:
+            user = 'public'
+    else:
+        local = True
+        user = None
+        if '--remote' in sys_args:
+            # Will communicate with remote
+            ssh = True
+        else:
+            # Running entirely locally
+            ssh = False
 
-    cfg_parser = SafeConfigParser()
-    cfg_parser.read(CONFIG_PATH)
+    # Add the options specified in the config file, but don't
+    # do it when running remotely (this was already done when
+    # initiating the command on the local computer).
+    if local:
+        CONFIG_PATH = os.path.expanduser('~/.abcd_config')
 
-    # Make sure appropriate sections exist
-    if not (cfg_parser.has_option('abcd', 'opts')):
-        if not cfg_parser.has_section('abcd'):
+        # Create the config file if it doesn't exist
+        if not os.path.isfile(CONFIG_PATH):
+            cfg_parser = SafeConfigParser()
             cfg_parser.add_section('abcd')
-        if not cfg_parser.has_option('abcd', 'opts'):
-            cfg_parser.set('abcd', 'opts', "''")
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            cfg_parser.write(cfg_file)
+            with open(CONFIG_PATH, 'w') as cfg_file:
+                cfg_parser.write(cfg_file)
 
-    # Load the options from the config file. Push them to the front of the list
-    # so they will be overwritten on the command line.
-    cfg_options = cfg_parser.get('abcd', 'opts')
-    new_args = []
-    if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
-        cfg_options = cfg_options[1:-1]
-    for opt in cfg_options.split(' '):
-        if opt:
-            new_args.append(opt)
-    args = new_args + args
+        cfg_parser = SafeConfigParser()
+        cfg_parser.read(CONFIG_PATH)
+
+        # Make sure appropriate sections exist
+        if not (cfg_parser.has_option('abcd', 'opts')):
+            if not cfg_parser.has_section('abcd'):
+                cfg_parser.add_section('abcd')
+            if not cfg_parser.has_option('abcd', 'opts'):
+                cfg_parser.set('abcd', 'opts', "''")
+            with open(CONFIG_PATH, 'w') as cfg_file:
+                cfg_parser.write(cfg_file)
+
+        # Load the options from the config file. Push them to the front of the list
+        # so they will be overwritten on the command line.
+        cfg_options = cfg_parser.get('abcd', 'opts')
+        new_args = []
+        if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
+            cfg_options = cfg_options[1:-1]
+        for opt in cfg_options.split(' '):
+            if opt:
+                new_args.append(opt)
+        sys_args = new_args + sys_args
 
     parser = argparse.ArgumentParser(usage = 'Usage: abcd [db-name] [selection] [options]',
                         description = description,
@@ -91,7 +120,7 @@ def main(args = sys.argv[1:]):
                         formatter_class=argparse.RawTextHelpFormatter)
 
     # Display usage if no arguments are supplied
-    if len(sys.argv) == 1:
+    if len(sys_args) == 1:
         parser.print_usage()
 
     add = parser.add_argument
@@ -100,12 +129,11 @@ def main(args = sys.argv[1:]):
     add('--verbose', action='store_true', default=False)
     add('--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
-    add('--user', help = argparse.SUPPRESS)
-    add('--ssh', action='store_true', default=False, help=argparse.SUPPRESS)
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
     add('--show', action='store_true', help='Show the database')
-    add('--no-pretty', action='store_true', help='Don\'t use pretty tables')
+    add('--pretty', action='store_true', default=True, help='Use pretty tables')
+    add('--no-pretty', action='store_false', dest='pretty', help='Don\'t use pretty tables')
     add('--limit', type=int, default=0, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
@@ -120,25 +148,29 @@ def main(args = sys.argv[1:]):
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     add('--remove', action='store_true',
         help='Remove selected rows.')
-    add('--no-confirmation', action='store_true',
-        help='Don\'t ask for confirmation')
+    add('--confirm', action='store_true', default=True,
+        help='Require confrmation when removing')
+    add('--no-confirm', action='store_false', dest='confirm',
+        help='Don\'t ask for confirmation when removing')
     add('--store', metavar='', nargs='+', help='Store a directory / list of files')
     add('--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
     add('--untar', action='store_true', default=False,
-        help='Automaticall untar files extracted with --extract-files')
+        help='Automatically untar files extracted with --extract-files')
+    add('--no-untar', action='store_false', dest='untar',
+        help='Don\'t automatically untar files extracted with --extract-files')
     add('--path-prefix', default='.', help='Path prefix for extracted files')
     add('--write-to-file', metavar='(type:)filename',
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('--ids', action='store_true', help='Print unique ids of selected configurations')
 
-    args = parser.parse_args(args)
+    args = parser.parse_args(sys_args)
 
     # Calculate the verbosity
     verbosity = 1 - args.quiet + args.verbose
 
     try:
-        run(args, verbosity)
+        run(args, sys_args, verbosity, local, ssh, user)
     except Exception as x:
         if verbosity < 2:
             print('{0}: {1}'.format(x.__class__.__name__, x), file=sys.stderr)
@@ -177,7 +209,7 @@ def communicate_via_ssh(host, sys_args, tty, data_out=None):
             pos = sys_args.index(arg)
             sys_args = sys_args[:pos] + sys_args[pos + 2:]
 
-    arguments = ' '.join(sys_args[1:])
+    arguments = ' '.join(sys_args)
     arguments = '\' {}\''.format(arguments)
     command = ssh_call + arguments
     
@@ -213,7 +245,7 @@ def untar_and_delete(tar_files, path_prefix):
             untar_file(f, path_prefix, quiet=True)
         os.remove(tarball)
 
-def run(args, verbosity):
+def run(args, sys_args, verbosity, local, ssh, user):
 
     def out(*args):
         '''Prints information in accordance to verbosity'''
@@ -254,17 +286,6 @@ def run(args, verbosity):
         for f in not_included:
             out('  ', f)
 
-    # Detect if the script is running over ssh
-    if args.ssh:
-        local = False
-        ssh = True
-    else:
-        local = True
-        if args.remote:
-            ssh = True
-        else:
-            ssh = False
-
     # Get the query
     q = QueryTranslator(*args.query)
     query = q.translate()
@@ -294,17 +315,17 @@ def run(args, verbosity):
 
 
     if args.remove and ssh and local:
-        communicate_via_ssh(args.remote, sys.argv, tty=True)
+        communicate_via_ssh(args.remote, sys_args, tty=True)
 
     # Remove entries from a database
     elif args.remove:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
         result = box.remove(token, query, just_one=False, 
-                            confirm=not args.no_confirmation)
+                            confirm=args.confirm)
         print(result.msg)
 
     elif args.write_to_file and ssh and local:
-        stdout, stderr, ret = communicate_via_ssh(args.remote, sys.argv, tty=False)
+        stdout, stderr, ret = communicate_via_ssh(args.remote, sys_args, tty=False)
 
         if stderr and not stderr.isspace():
             to_stderr(stderr)
@@ -317,7 +338,7 @@ def run(args, verbosity):
     # Extract a configuration from the database and write it
     # to the specified file.
     elif args.write_to_file:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
 
         filename = args.write_to_file
         if '.' in filename:
@@ -400,7 +421,7 @@ def run(args, verbosity):
 
     # Receives the tar file and untars it
     elif args.extract_original_files and ssh and local:
-        stdout, stderr, ret = communicate_via_ssh(args.remote, sys.argv, tty=False)
+        stdout, stderr, ret = communicate_via_ssh(args.remote, sys_args, tty=False)
 
         if stderr and not stderr.isspace():
             to_stderr(stderr)
@@ -423,7 +444,7 @@ def run(args, verbosity):
     # (current directory by default), or print the file
     # to stdout.
     elif args.extract_original_files:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
 
         # If over ssh, create a tar file in memory
         if ssh and not local:
@@ -505,7 +526,7 @@ def run(args, verbosity):
     elif args.store and ssh and not local:
         # Authenticate before unpickling received data
         # (only trust known users)
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
 
         data_in = json.loads(b64decode(sys.stdin.read()))
 
@@ -630,10 +651,10 @@ def run(args, verbosity):
 
             # Serialise the data and send it to remote
             data_string = json.dumps(data_out)
-            communicate_via_ssh(args.remote, sys.argv, tty=True, data_out=data_string)
+            communicate_via_ssh(args.remote, sys_args, tty=True, data_out=data_string)
         else:
             # Write atoms to the database
-            box, token = init_backend(args.database, args.user)
+            box, token = init_backend(args.database, user)
             atoms_list = [dct['atoms'] for dct in parsed]
             result = box.insert(token, atoms_list, kvp)
 
@@ -641,26 +662,26 @@ def run(args, verbosity):
 
     elif args.add_keys:
         if ssh and local:
-            communicate_via_ssh(args.remote, sys.argv, tty=True)
+            communicate_via_ssh(args.remote, sys_args, tty=True)
         else:
-            box, token = init_backend(args.database, args.user)
+            box, token = init_backend(args.database, user)
             result = box.add_keys(token, query, kvp)
             print(result.msg)
 
     elif args.remove_keys:
         if ssh and local:
-            communicate_via_ssh(args.remote, sys.argv, tty=True)
+            communicate_via_ssh(args.remote, sys_args, tty=True)
         else:
-            box, token = init_backend(args.database, args.user)
+            box, token = init_backend(args.database, user)
             result = box.remove_keys(token, query, remove_keys)
             print(result.msg)
 
     elif args.count and ssh and local:
-        communicate_via_ssh(args.remote, sys.argv, tty=True)
+        communicate_via_ssh(args.remote, sys_args, tty=True)
 
     # Count selected configurations
     elif args.count:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
 
         if args.limit == 0:
             lim = 0
@@ -677,15 +698,15 @@ def run(args, verbosity):
         print('Found:', count)
     
     elif args.show and ssh and local:
-        communicate_via_ssh(args.remote, sys.argv, tty=True)
+        communicate_via_ssh(args.remote, sys_args, tty=True)
 
     
 
     elif ssh and local:
-        communicate_via_ssh(args.remote, sys.argv, tty=True)
+        communicate_via_ssh(args.remote, sys_args, tty=True)
 
     elif args.ids:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
@@ -694,7 +715,7 @@ def run(args, verbosity):
 
     # Show the database
     elif args.show:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
@@ -703,33 +724,33 @@ def run(args, verbosity):
             truncate = False
         else:
             truncate = True
-        print_rows(atoms_it, border=not args.no_pretty, 
+        print_rows(atoms_it, border=args.pretty, 
             truncate=truncate, show_keys=keys, omit_keys=omit_keys)
 
     # List all available databases
     elif (args.list or not args.database) and ssh and local:
-        communicate_via_ssh(args.remote, sys.argv, tty=True)
+        communicate_via_ssh(args.remote, sys_args, tty=True)
         return
 
     elif args.list or not args.database:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
 
         dbs = box.list(token)
-        if args.user:
-            user = args.user
+        if user:
+            username = user
         else:
-            user = 'Local User'
+            username = 'Local User'
         if dbs:
-            print(('Hello, {}. Databases you have access to:').format(user))
+            print(('Hello, {}. Databases you have access to:').format(username))
             for db in dbs:
                 print('   {}'.format(db))
         else:
-            print(('Hello, {}. You don\'t have access to any databases.').format(user))
+            print(('Hello, {}. You don\'t have access to any databases.').format(username))
         return
 
     # Print info about keys
     else:
-        box, token = init_backend(args.database, args.user)
+        box, token = init_backend(args.database, user)
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
