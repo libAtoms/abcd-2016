@@ -7,6 +7,7 @@ import argparse
 import subprocess
 import tarfile
 import StringIO
+from ConfigParser import SafeConfigParser
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -50,13 +51,47 @@ examples = '''
 def main(args = sys.argv[1:]):
     if isinstance(args, str):
         args = args.split(' ')
+
+    # Add the options specified in the config file
+    CONFIG_PATH = os.path.expanduser('~/.abcd_config')
+
+    # Create the config file if it doesn't exist
+    if not os.path.isfile(CONFIG_PATH):
+        cfg_parser = SafeConfigParser()
+        cfg_parser.add_section('abcd')
+        with open(CONFIG_PATH, 'w') as cfg_file:
+            cfg_parser.write(cfg_file)
+
+    cfg_parser = SafeConfigParser()
+    cfg_parser.read(CONFIG_PATH)
+
+    # Make sure appropriate sections exist
+    if not (cfg_parser.has_option('abcd', 'opts')):
+        if not cfg_parser.has_section('abcd'):
+            cfg_parser.add_section('abcd')
+        if not cfg_parser.has_option('abcd', 'opts'):
+            cfg_parser.set('abcd', 'opts', "''")
+        with open(CONFIG_PATH, 'w') as cfg_file:
+            cfg_parser.write(cfg_file)
+
+    # Load the options from the config file. Push them to the front of the list
+    # so they will be overwritten on the command line.
+    cfg_options = cfg_parser.get('abcd', 'opts')
+    new_args = []
+    if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
+        cfg_options = cfg_options[1:-1]
+    for opt in cfg_options.split(' '):
+        if opt:
+            new_args.append(opt)
+    args = new_args + args
+
     parser = argparse.ArgumentParser(usage = 'Usage: abcd [db-name] [selection] [options]',
                         description = description,
                         epilog = 'Examples: ' + examples,
                         formatter_class=argparse.RawTextHelpFormatter)
 
     # Display usage if no arguments are supplied
-    if len(sys.argv)==1:
+    if len(sys.argv) == 1:
         parser.print_usage()
 
     add = parser.add_argument
@@ -97,7 +132,7 @@ def main(args = sys.argv[1:]):
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('--ids', action='store_true', help='Print unique ids of selected configurations')
 
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     # Calculate the verbosity
     verbosity = 1 - args.quiet + args.verbose

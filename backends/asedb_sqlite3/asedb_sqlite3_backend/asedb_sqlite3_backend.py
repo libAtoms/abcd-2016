@@ -28,15 +28,16 @@ def get_dbs_path():
     dbs_path = None
     parser = SafeConfigParser()
 
+    cmd = 'python {} --setup'.format(FILE_NAME)
+
     # Read the config file if it exists
     if os.path.isfile(CONFIG_PATH):
         try:
             parser.read(CONFIG_PATH)
             dbs_path = parser.get('ase-db', 'dbs_path')
         except:
-            raise RuntimeError('Could not read {}'.format(CONFIG_PATH))
+            raise RuntimeError('There were problems reading {}. Did you run {}?'.format(CONFIG_PATH, cmd))
     else:
-        cmd = 'python {} --setup'.format(FILE_NAME)
         raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
     return dbs_path
 
@@ -299,6 +300,7 @@ class ASEdbSQlite3Backend(Backend):
             atoms.info['unique_id'] = row.unique_id
             if row._keys:
                 atoms.info.update(row.key_value_pairs)
+
             data = row.get('data')
             if data:
                 for (key, value) in data.items():
@@ -322,6 +324,7 @@ class ASEdbSQlite3Backend(Backend):
 
             for key in keys_to_delete:
                 atoms.info.pop(key, None)
+
             return atoms
 
         # Convert it to the Atoms iterator.
@@ -373,19 +376,27 @@ def setup():
     '''
     Create a config file and a directory in which databases will be stored.
     '''
-    # Check if the config file exists
-    if not os.path.isfile(CONFIG_PATH):
-        # Ask user for the path to the databases folder
-        dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
 
-        # Create the config file
+    # Check if the config file exists. If it doesn't, create it
+    if not os.path.isfile(CONFIG_PATH):
         parser = SafeConfigParser()
         parser.add_section('ase-db')
-        parser.set('ase-db', 'dbs_path', dbs_path)
-        cfg_file = open(CONFIG_PATH,'w')
-        parser.write(cfg_file)
-        cfg_file.close()
-        print '  Created a config file at {}'.format(CONFIG_PATH)
+        with open(CONFIG_PATH, 'w') as cfg_file:
+            parser.write(cfg_file)
+
+    # Make sure appropriate sections exist
+    parser = SafeConfigParser()
+    parser.read(CONFIG_PATH)
+
+    if not parser.has_option('ase-db', 'dbs_path'):
+        if not parser.has_section('ase-db'):
+            parser.add_section('ase-db')
+        if not parser.has_option('ase-db', 'dbs_path'):
+            # Ask the user for the path to the databases folder
+            dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
+            parser.set('ase-db', 'dbs_path', dbs_path)
+        with open(CONFIG_PATH, 'w') as cfg_file:
+            parser.write(cfg_file)
     else:
         dbs_path = get_dbs_path()
         print '  Config file found at {}'.format(CONFIG_PATH)
