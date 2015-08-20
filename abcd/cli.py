@@ -53,12 +53,11 @@ def main():
     if isinstance(sys_args, str):
         sys_args = sys_args.split(' ')
 
-    # Detect if the script is running via ssh and get
-    # the username
+    # Detect whether the script is running locallly or not
+    # and get the username
     if '--ssh' in sys_args:
         # Running on the remote computer
         local = False
-        ssh = True
         sys_args.remove('--ssh')
 
         # Get the username
@@ -71,12 +70,6 @@ def main():
     else:
         local = True
         user = None
-        if '--remote' in sys_args:
-            # Will communicate with remote
-            ssh = True
-        else:
-            # Running entirely locally
-            ssh = False
 
     # Add the options specified in the config file, but don't
     # do it when running remotely (this was already done when
@@ -175,6 +168,18 @@ def main():
         args.remote = remote
         args.database = database
 
+    # For running locally: decide whether the script will open connection
+    # to the remote and or run purely locally
+    if local:
+        if args.remote is not None:
+            # Will communicate with remote
+            ssh = True
+        else:
+            # Running entirely locally
+            ssh = False
+    else:
+        ssh = True
+
     # Calculate the verbosity
     verbosity = 1 - args.quiet + args.verbose
 
@@ -211,17 +216,11 @@ def communicate_via_ssh(host, sys_args, tty, data_out=None):
         ssh_call = 'echo {} | ssh -q {} {} '.format(b64encode(data_out), tty_flag, host)
     else:
         ssh_call = 'ssh -q {} {} '.format(tty_flag, host)
-    
-    # Remove the 'remote' argument
-    for arg in ['--remote', '-remote', '--r', '-r']:
-        while arg in sys_args:
-            pos = sys_args.index(arg)
-            sys_args = sys_args[:pos] + sys_args[pos + 2:]
 
     arguments = ' '.join(sys_args)
     arguments = '\' {}\''.format(arguments)
     command = ssh_call + arguments
-    
+
     process = subprocess.Popen(command, shell=True, stdout=stdout, stderr=stderr)
     stdout, stderr = process.communicate()
 
