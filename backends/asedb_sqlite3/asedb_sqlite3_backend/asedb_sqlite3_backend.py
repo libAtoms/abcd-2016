@@ -358,22 +358,29 @@ def add_user(user):
     dbs_path = get_dbs_path()
     user_dbs_path = os.path.join(dbs_path, user)
 
-    # Check if this user already exists
-    if os.path.isdir(user_dbs_path):
-        print '  User "{}" already exists'.format(user)
-        return
-    else:
-        # Make a directory for the user
-        os.mkdir(user_dbs_path)
+    # Make sure ~/.ssh/authorized_keys file exists
+    ssh_dir = os.path.dirname(AUTHORIZED_KEYS)
+    if not os.path.isdir(ssh_dir):
+        os.makedirs(ssh_dir)
+        os.chmod(ssh_dir, 0700)
+    if not os.path.isfile(AUTHORIZED_KEYS):
+        open(AUTHORIZED_KEYS, 'a').close()
+        os.chmod(AUTHORIZED_KEYS, 0644)
 
     # Add user's credentials to the authorized_keys file
     public_key = raw_input('Enter the ssh public key for {}: '.format(user))
     line = '\ncommand=". ~/.bash_profile && abcd --ssh --user {} ${{SSH_ORIGINAL_COMMAND}}" {}'.format(user, public_key)
     with open(AUTHORIZED_KEYS, 'a') as f:
         f.write(line)
-
     print '  Added a key for user "{}" to {}'.format(user, AUTHORIZED_KEYS)
-    print '  Created {}'.format(user_dbs_path)
+
+    # Check if this user already exists
+    if os.path.isdir(user_dbs_path):
+        print '  Directory for user "{}" already exists under {}'.format(user, user_dbs_path)
+    else:
+        # Make a directory for the user
+        os.mkdir(user_dbs_path)
+        print '  Created {}'.format(user_dbs_path)
 
 def setup():
     '''
