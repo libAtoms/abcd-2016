@@ -166,6 +166,9 @@ class ASEdbSQlite3Backend(Backend):
         if '.db' not in database:
             database += '.db'
 
+        # For security reasons
+        database = os.path.basename(database)
+
         # Look inside the root_dir to see if the datbase exists
         if not os.path.isfile(os.path.join(self.root_dir, database)):
             if not create_new:
