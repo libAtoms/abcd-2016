@@ -120,7 +120,7 @@ def main():
                         formatter_class=argparse.RawTextHelpFormatter)
 
     # Display usage if no arguments are supplied
-    if len(sys_args) == 1:
+    if len(sys_args) == 0:
         parser.print_usage()
 
     add = parser.add_argument
