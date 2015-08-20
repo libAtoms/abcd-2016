@@ -51,3 +51,8 @@ class UsernameAndPassword(Credentials):
     @property
     def password(self):
         return base64.b64decode(self.password)
+
+
+class AuthenticationError(Exception):
+    def __init__(self, message):
+        super(AuthenticationError, self).__init__(message)

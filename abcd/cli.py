@@ -532,8 +532,6 @@ def run(args, sys_args, verbosity, local, ssh, user):
 
     # Receive configurations via stdin and write it to the database
     elif args.store and ssh and not local:
-        # Authenticate before unpickling received data
-        # (only trust known users)
         box, token = init_backend(args.database, user)
 
         data_in = json.loads(b64decode(sys.stdin.read()))

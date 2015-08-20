@@ -3,6 +3,7 @@ import abcd.backend
 import abcd.results as results
 from abcd.query import Condition, And
 from abcd.util import get_info_and_arrays
+from abcd.authentication import AuthenticationError
 
 from ase.db import connect
 from ase.utils import plural
@@ -17,12 +18,15 @@ from random import randint
 import glob
 import time
 import numpy as np
+import re
 
 CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
 AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
 FILE_NAME = os.path.basename(__file__)
 if FILE_NAME.endswith('.pyc'):
     FILE_NAME = FILE_NAME[:-1]
+
+reserved_usernames = ['public', 'all', 'local']
 
 def get_dbs_path():
     dbs_path = None
@@ -102,6 +106,8 @@ class ASEdbSQlite3Backend(Backend):
         return func_wrapper
 
     def __init__(self, database=None, user=None, password=None):
+        if user == 'all':
+            raise RuntimeError('Invalid username: '.format('all'))
         self.user = user
         self.dbs_path = get_dbs_path()
         self.connection = None
@@ -156,6 +162,8 @@ class ASEdbSQlite3Backend(Backend):
         return [os.path.basename(db) for db in dbs]
 
     def authenticate(self, credentials):
+        if credentials.username in reserved_usernames:
+            raise AuthenticationError('Username "{}" is reserved'.format(credentials.username))
         return credentials.username
 
     def connect_to_database(self, database, create_new=True):
@@ -355,6 +363,13 @@ class ASEdbSQlite3Backend(Backend):
         return True
 
 def add_user(user):
+    if user in reserved_usernames:
+        print 'Error: username "{}" is reserved'.format(user)
+        return
+    if not re.match(r'^[A-Za-z0-9_]+$', user):
+        print 'Error: username cannot contain characters which are not alphanumeric or underscores'
+        return
+
     dbs_path = get_dbs_path()
     user_dbs_path = os.path.join(dbs_path, user)
 
