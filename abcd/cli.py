@@ -166,6 +166,15 @@ def main():
 
     args = parser.parse_args(sys_args)
 
+    # Do some post-processing
+    if args.database is not None and ':' in args.database:
+        remote, database = args.database.split(':')
+        if args.remote is not None:
+            print('Error: Remote specified twice: "--remote {}" and "{}"'.format(args.remote, args.database), file=sys.stderr)
+            sys.exit()
+        args.remote = remote
+        args.database = database
+
     # Calculate the verbosity
     verbosity = 1 - args.quiet + args.verbose
 
