@@ -7,9 +7,16 @@ Apart from ASE (min. version required 3.10.0.4590), no additional python modules
 - ```abcd --help``` - display help
 - ```abcd --remote abcd@gc121mac1 db1.db --show```  - display the database
 - ```abcd --remote abcd@gc121mac1 db1.db``` - display information about available keys
-- ```abcd --remote abcd@gc121mac1 db1.db 'energy<0.6 elements~C elements~H,F,Cl'``` - querying
-- ```abcd --remote abcd@gc121mac1 db1.db --extract-original-files --path-prefix extracted_files``` - extract original files to the specified folder
-- ```abcd --remote abcd@gc121mac1 db1.db --write-to-file extr%03d.xyz``` - write configurations from the database to files extr001.xyz, extr002.xyz, ...
+- ```abcd abcd@gc121mac1:db1.db 'energy<0.6 elements~C elements~H,F,Cl'``` - querying (remote can be specified using a colon before the database name)
+- ```abcd abcd@gc121mac1:db1.db --extract-original-files --path-prefix extracted_files``` - extract original files to the specified folder
+- ```abcd abcd@gc121mac1:db1.db --write-to-file extr%03d.xyz``` - write configurations from the database to files extr001.xyz, extr002.xyz, ...
+
+**Note for the OSX users:** If you see the following warning when connecting to a remote:  
+> Warning: No xauth data; using fake authentication data for X11 forwarding.
+> X11 forwarding request failed on channel 0
+
+You can remove it by adding the following line to the ~/.ssh/config file on your local machine:  
+> ForwardX11 no
 
 ### Examples of running locally
 
