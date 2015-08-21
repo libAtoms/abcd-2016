@@ -2,7 +2,6 @@
 
 ## Frontend
 
-* Translate the quering language to the MongoDB querying language.
 * Allow a read-only access
 * Ability to update configurations (check out, do some calculations, update the database). For this the ids need to be sorted out (configurations can be identified by their unique_id keys).
 * copy/move files from one database to another, including a new database
