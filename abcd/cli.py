@@ -295,11 +295,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
             out('  ', f)
 
     # Get the query
-    query = []
-    for q in args.query:
-        query += q.split(' ')
-    if query != '':
-        query = translate(query)
+    query = translate(args.query)
 
     # Decide which keys to show
     if args.keys == '++':

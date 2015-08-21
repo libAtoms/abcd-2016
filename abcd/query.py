@@ -1,13 +1,14 @@
 __author__ = 'Patrick Szmucer'
 
+import shlex
 from ase.data import chemical_symbols
 
 # This is a list of operators that can be used on the command line
 operators = ['=', '!=', '>', '>=', '<', '<=', '~']
 
 class QueryError(Exception):
-    def __init__(self, message):
-        super(QueryError, self).__init__(message)
+	def __init__(self, message):
+		super(QueryError, self).__init__(message)
 
 def is_float(n):
 	try:
@@ -106,8 +107,20 @@ def update(d1, d2):
 		else:
 			d1[k] = v
 
-def translate(queries):
+def translate(queries_lst):
 	'''Translates a list of queries to the MongoDB format'''
+
+	# Pre-process the queries. Take care to not split key values
+	# with spaces in them.
+	queries = []
+	for q in queries_lst:
+		# Check the number of operators in the query.
+		n = sum([q.count(op) for op in operators]) - sum(q.count(op) for op in ['!=', '>=', '<='])
+		if n > 1:
+			queries += shlex.split(q)
+		else:
+			queries.append(q)
+
 	mongodb_query = {'$and': []}
 	for query in queries:
 		mongodb_query['$and'].append(interpret(query))
