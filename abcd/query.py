@@ -1,139 +1,114 @@
 __author__ = 'Patrick Szmucer'
 
-'''
-QUERYING CONVENTION
-Query is a list of the Condition objects. Each Condition object specifies
-the following:
-- key - a key that will be searched. Searchable Atoms properties are all
-		properties contained in the Atoms object and Atoms.info dictionary. 
-		Arrays are not searchable. A number of additional keys which are 
-		not directly stored in the atoms object can be specified. These 
-		are specified below as "additional_keys".
-- operator - one of:
-	'=' - equal
-	'!=' - not equal
-	'>' - greater
-	'>=' - greater or equal
-	'<' - less
-	'<=' - less or equal
-	'~' - contains
-- operand - LogicalList, which is a list of items linked by and/or.
+from ase.data import chemical_symbols
 
-This list of queries is sent to the backend which then interprets it.
-'''
-
+# This is a list of operators that can be used on the command line
 operators = ['=', '!=', '>', '>=', '<', '<=', '~']
-additional_keys = ['formula', 'natoms']
 
-class LogicalList(object):
-	'''
-	List of items linked by a logical operator
-	"and" or "or".
-	'''
+class QueryError(Exception):
+    def __init__(self, message):
+        super(QueryError, self).__init__(message)
 
-	linking_operators = ['and', 'or']
+def is_float(n):
+	try:
+		n = float(n)
+	except ValueError:
+		return False
+	else:
+		return True
 
-	def __init__(self, operator, lst):
-		'''
-		:param string operator: One of and/or
-		:param list lst: list of items
-		'''
-		if operator not in self.linking_operators:
-			raise RuntimeError('Unsupported operator {}'.format(operator))
-		self.linking_operator = operator
-		self.list = lst
+def is_int(n):
+	try:
+		a = int(n)
+		b = float(n)
+	except ValueError:
+		return False
+	else:
+		return a == b
 
-	def __str__(self):
-		return '{}{}'.format(self.linking_operator.upper(), self.list)
+def elements2numbers(elements):
+	for i, v in enumerate(elements):
+		try:
+			elements[i] = chemical_symbols.index(elements[i])
+		except ValueError:
+			raise QueryError('Unknown element: {}'.format(elements[i]))
 
-def And(*args):
-	return LogicalList('and', args)
+def interpret(query):
+	'''Translates a single query to the MongoDB format'''
 
-def Or(*args):
-	return LogicalList('or', args)
+	# Find the operator
+	operator = None
+	for op in operators:
+		if op in query:
+			operator = op
 
-class Condition(object):
-	def __init__(self, key, operator, operand):
-		'''
-		:param key: LHS of the condition (key)
-		:type key: string
-		:param operator: operator
-		:type operator: string
-		:param rhs: RHS of the operator
-		:type rhs: list of strings/numbers
-		'''
-		if operator in operators:
-			self.operator = operator
+	if operator is None:
+		raise QueryError(query)
+
+	key, vals = query.split(operator)
+	vals = vals.split(',')
+
+	if len(vals) == 0 or '' in vals:
+		raise QueryError(query)
+
+	# Convert strings representing numbers to numbers
+	for i, v in enumerate(vals):
+		if is_int(v):
+			vals[i] = int(v)
+		elif is_float(v):
+			vals[i] = float(v)
+
+	dct = {}
+	if operator == '=' and len(vals) == 1:
+		dct[key] = {'$eq': vals[0]}
+	elif operator == '=':
+		dct[key] = {'$in': vals}
+	elif operator == '!=' and len(vals) == 1:
+		dct[key] = {'$ne': vals[0]}
+	elif operator == '!=':
+		dct[key] = {'$nin': vals}
+	elif operator == '>' and len(vals) == 1:
+		dct[key] = {'$gt': vals[0]}
+	elif operator == '>':
+		raise QueryError(query)
+	elif operator == '>=' and len(vals) == 1:
+		dct[key] = {'$gte': vals[0]}
+	elif operator == '>=':
+		raise QueryError(query)
+	elif operator == '<' and len(vals) == 1:
+		dct[key] = {'$lt': vals[0]}
+	elif operator == '<':
+		raise QueryError(query)
+	elif operator == '<=' and len(vals) == 1:
+		dct[key] = {'$lte': vals[0]}
+	elif operator == '<=':
+		raise QueryError(query)
+	elif operator == '~':
+		# Searching will be done on the 'numbers' array
+		if key == 'elements':
+			key = 'numbers'
+			elements2numbers(vals)
+		dct[key] = {'$in': vals}
+	else:
+		raise QueryError(query)
+
+	return dct
+
+def update(d1, d2):
+	'''Update dictionary d1 with d2'''
+	for k, v in d2.iteritems():
+		if k in d1:
+			for op in d2[k].keys():
+				if op in d1[k]:
+					d1[k][op] += d2[k][op]
+				else:
+					d1[k].update(d2[k])
 		else:
-			raise RuntimeError('Unknown operator {}'.format(operator))
-		self.operand = operand
-		self.key = key
+			d1[k] = v
 
-	def __str__(self):
-		return '{} {} {}'.format(self.key, self.operator, self.operand)
-
-class QueryTranslator(object):
-	def __init__(self, *args):
-		'''
-		:param *args: list of individual queries or string of queries 
-					separated by spaces.
-		'''
-		queries = []
-		for arg in args:
-			queries += arg.split(' ')
-		self.queries = queries
-	
-	def translate(self):
-		'''
-		Translates from the CLI query language to
-		a list of conditions.
-
-		:return: Returns a list of conditions
-		:rtype: list
-		'''
-		operators.sort(key=len, reverse=True)
-		conditions = []
-
-		def is_float(n):
-			try:
-				n = float(n)
-			except ValueError:
-				return False
-			else:
-				return True
-
-		def is_int(n):
-			try:
-				a = int(n)
-				b = float(n)
-			except ValueError:
-				return False
-			else:
-				return a == b
-
-		def interpret(query, operator):
-			key, vals = query.split(op)
-			vals = vals.split(',')
-			for i, v in enumerate(vals):
-				if is_int(v):
-					vals[i] = int(v)
-				elif is_float(v):
-					vals[i] = float(v)
-			if operator == '!=':
-				Link = And
-			else:
-				Link = Or
-			c = Condition(key, op, Link(*vals))
-			conditions.append(c)
-
-		for query in self.queries:
-			valid_query = False
-			for op in operators:
-				if op in query:
-					interpret(query, op)
-					valid_query = True
-					break
-			if not valid_query:
-				raise RuntimeError('Invalid query: {}'.format(query))
-
-		return conditions
+def translate(queries):
+	'''Translates a list of queries to the MongoDB format'''
+	mongodb_query = {'$and': []}
+	for query in queries:
+		mongodb_query['$and'].append(interpret(query))
+	return mongodb_query

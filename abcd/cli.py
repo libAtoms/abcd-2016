@@ -27,7 +27,7 @@ except ImportError as e:
 if backend_enabled:
     from structurebox import StructureBox
     from authentication import Credentials
-    from query import QueryTranslator
+    from query import translate
     from table import print_keys_table, print_rows
     from util import atoms2dict, dict2atoms
     import json
@@ -295,8 +295,11 @@ def run(args, sys_args, verbosity, local, ssh, user):
             out('  ', f)
 
     # Get the query
-    q = QueryTranslator(*args.query)
-    query = q.translate()
+    query = []
+    for q in args.query:
+        query += q.split(' ')
+    if query != '':
+        query = translate(query)
 
     # Decide which keys to show
     if args.keys == '++':

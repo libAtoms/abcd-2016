@@ -40,7 +40,10 @@ Operator ```!=``` is an exception, because comma-separated values that follow it
 
 - ```user!=alice,bob``` - means "*user* is not alice AND not bob"
 
-Note that if a query contains "<" or ">" it needs to be enclosed in quotes.
+**Notes** 
+
+- If a query contains "<" or ">" it needs to be enclosed in quotes.
+- (Only for the ASEdb SQLite3 backend) If a row doesn't contain a key K, then a query ```K!=VAL``` will not show this row. This might change in future versions.
 
 ### Installing
 

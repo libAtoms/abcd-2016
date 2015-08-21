@@ -1,15 +1,16 @@
 from abcd.backend import Backend
 import abcd.backend
 import abcd.results as results
-from abcd.query import Condition, And
 from abcd.util import get_info_and_arrays
 from abcd.authentication import AuthenticationError
+from abcd.query import QueryError
 
 from ase.db import connect
 from ase.utils import plural
 from ase.atoms import Atoms
 from ase.calculators.calculator import get_calculator, all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
+from ase.data import chemical_symbols
 
 import os
 from ConfigParser import SafeConfigParser
@@ -45,40 +46,55 @@ def get_dbs_path():
         raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
     return dbs_path
 
-def translate_query(conditions):
-
-    # Split conditions with ANDed operands into
-    # multiple conditions
-    new_conditions = []
-    for i, cond in enumerate(conditions):
-        if cond.operand.linking_operator == 'and':
-            for val in cond.operand.list:
-                new_c = Condition(cond.key, cond.operator, And(val))
-                new_conditions.append(new_c)
-        else:
-            new_conditions.append(cond)
-    conditions = new_conditions
-
-    keys = [cond.key for cond in conditions]
-    operators = [cond.operator for cond in conditions]
-    link_operators = [cond.operand.linking_operator for cond in conditions]
-    value_list = list(product(*[cond.operand.list for cond in conditions]))
-
+def interpret(key, op, val):
+    # Returns a list of ASEdb queries, where elements in this list
+    # are assumed to be ORed.
     queries = []
-    for vals in value_list:
-        q = []
-        for i, key in enumerate(keys):
-            if key == 'elements' and operators[i] == '~':
-                q.append(vals[i])
-            elif key == 'elements' and operators[i] != '~':
-                raise RuntimeError('"elements" key can only be used with "~"')
-            elif operators[i] == '~' and key != 'elements':
-                raise RuntimeError('"~" can only be used with the "elements" key')
+    if op == '$eq':
+        queries.append('{}={}'.format(key, val))
+    elif op == '$in':
+        if key == 'numbers':
+            if isinstance(val, list):
+                for v in val:
+                    queries.append(str(chemical_symbols[v]))
             else:
-                q.append('{}{}{}'.format(key, operators[i], vals[i]))
-        queries.append(','.join(q))
+                queries.append(str(chemical_symbols[v]))
+        else:
+            if isinstance(val, list):
+                for v in val:
+                    queries.append('{}={}'.format(key, v))
+            else:
+                queries.append('{}={}'.format(key, v))
+    elif op == '$ne':
+        queries.append('{}!={}'.format(key, val))
+    elif op == '$nin':
+        queries.append(','.join(['{}!={}'.format(key, v) for v in val]))
+    elif op == '$gt':
+        queries.append('{}>{}'.format(key, val))
+    elif op == '$gte':
+        queries.append('{}>={}'.format(key, val))
+    elif op == '$lt':
+        queries.append('{}<{}'.format(key, val))
+    elif op == '$lte':
+        queries.append('{}<={}'.format(key, val))
+    else:
+        raise QueryError('{} {} {}'.format(key, op, val))
 
     return queries
+
+def translate_query(query):
+    '''Translates the MongoDB query to the ASEdb query'''
+
+    asedb_queries = []
+    for single_query in query['$and']:
+        for key, dct in single_query.iteritems():
+            for op, val in dct.iteritems():
+                 asedb_queries.append(interpret(key, op, val))
+
+    # Because ASEdb doesn't understand ORs, we need to split up
+    # expressions with ORs into separate queries
+    asedb_queries = list(product(*asedb_queries))
+    return [','.join(lst) for lst in asedb_queries]
 
 class ASEdbSQlite3Backend(Backend):
 
