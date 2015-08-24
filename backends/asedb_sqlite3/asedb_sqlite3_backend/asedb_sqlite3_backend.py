@@ -40,7 +40,7 @@ class ASEdbSQlite3Backend(Backend):
         '''When a function is decorated with this, an error will be thrown if 
             the connection to a database is not open.'''
         def func_wrapper(*args, **kwargs):
-            if not args[0].connection:
+            if args[0].connection is None:
                 raise ReadError("No database is specified")
             else:
                 return func(*args, **kwargs)
@@ -79,7 +79,7 @@ class ASEdbSQlite3Backend(Backend):
         # root_dir is the directory in which user's databases are stored
         self.root_dir = os.path.join(self.dbs_path, home)
 
-        if database:
+        if database is not None:
             self.connect_to_database(database)
 
         super(ASEdbSQlite3Backend, self).__init__()
