@@ -4,7 +4,7 @@ from ConfigParser import SafeConfigParser
 
 reserved_usernames = ['public', 'all', 'local']
 
-CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
+CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_asedb_config')
 AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
 
 def get_dbs_path():

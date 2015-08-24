@@ -7,7 +7,6 @@ import argparse
 import subprocess
 import tarfile
 import StringIO
-from ConfigParser import SafeConfigParser
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -17,21 +16,12 @@ from ase.calculators.calculator import get_calculator
 from ase.db.core import convert_str_to_float_or_str
 from ase.atoms import Atoms
 
-try:
-    from asedb_sqlite3_backend.asedb_sqlite3_backend import ASEdbSQlite3Backend
-    backend_enabled = True
-except ImportError as e:
-    backend_enabled = False
-    backend_import_err = str(e)
-
-if backend_enabled:
-    from structurebox import StructureBox
-    from authentication import Credentials
-    from query import translate
-    from table import print_keys_table, print_rows
-    from util import atoms2dict, dict2atoms
-    import json
-    from base64 import b64encode, b64decode
+from structurebox import StructureBox
+from authentication import Credentials
+from query import translate
+from table import print_keys_table, print_rows
+from util import atoms2dict, dict2atoms
+from config import read_config_file, create_config_file, config_file_exists
 
 description = ''
 
@@ -79,34 +69,13 @@ def main():
         user = None
         readonly = False
 
-    # Add the options specified in the config file, but don't
-    # do it when running remotely (this was already done when
-    # initiating the command on the local computer).
+    if not config_file_exists():
+        create_config_file()
+
     if local:
-        CONFIG_PATH = os.path.expanduser('~/.abcd_config')
-
-        # Create the config file if it doesn't exist
-        if not os.path.isfile(CONFIG_PATH):
-            cfg_parser = SafeConfigParser()
-            cfg_parser.add_section('abcd')
-            with open(CONFIG_PATH, 'w') as cfg_file:
-                cfg_parser.write(cfg_file)
-
-        cfg_parser = SafeConfigParser()
-        cfg_parser.read(CONFIG_PATH)
-
-        # Make sure appropriate sections exist
-        if not (cfg_parser.has_option('abcd', 'opts')):
-            if not cfg_parser.has_section('abcd'):
-                cfg_parser.add_section('abcd')
-            if not cfg_parser.has_option('abcd', 'opts'):
-                cfg_parser.set('abcd', 'opts', "''")
-            with open(CONFIG_PATH, 'w') as cfg_file:
-                cfg_parser.write(cfg_file)
-
         # Load the options from the config file. Push them to the front of the list
         # so they will be overwritten on the command line.
-        cfg_options = cfg_parser.get('abcd', 'opts')
+        cfg_options = read_config_file().get('abcd', 'opts')
         new_args = []
         if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
             cfg_options = cfg_options[1:-1]
@@ -201,11 +170,21 @@ def main():
             raise
 
 def init_backend(db, user, readonly):
-    if not backend_enabled:
-        raise ImportError(backend_import_err)
+    # Get the backend location and name from the config file
+    cfg = read_config_file()
+    backend_module = cfg.get('abcd', 'backend_module')
+    backend_name = cfg.get('abcd', 'backend_name')
 
-    # Initialise the backend
-    box = StructureBox(ASEdbSQlite3Backend(database=db, user=user, readonly=readonly))
+    if not backend_module or not backend_name:
+        print('  Please specify the backend in ~/.abcd_config')
+        sys.exit()
+
+    # Import the backend and other external libraries
+    Backend = getattr(__import__(backend_module, fromlist=[backend_name]), backend_name)
+    from base64 import b64encode, b64decode
+    import json
+
+    box = StructureBox(Backend(database=db, user=user, readonly=readonly))
     token = box.authenticate(Credentials(user))
 
     return box, token
