@@ -69,7 +69,7 @@ def main():
             user = 'public'
 
         # Get the access mode
-        if '--readonly' in sys.args:
+        if '--readonly' in sys_args:
             readonly = True
             sys_args.remove('--readonly')
         else:
