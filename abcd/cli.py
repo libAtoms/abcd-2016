@@ -67,9 +67,17 @@ def main():
             sys_args = sys_args[:idx] + sys_args[idx + 2:]
         else:
             user = 'public'
+
+        # Get the access mode
+        if '--readonly' in sys.args:
+            readonly = True
+            sys_args.remove('--readonly')
+        else:
+            readonly = False
     else:
         local = True
         user = None
+        readonly = False
 
     # Add the options specified in the config file, but don't
     # do it when running remotely (this was already done when
@@ -184,7 +192,7 @@ def main():
     verbosity = 1 - args.quiet + args.verbose
 
     try:
-        run(args, sys_args, verbosity, local, ssh, user)
+        run(args, sys_args, verbosity, local, ssh, user, readonly)
     except Exception as x:
         if verbosity < 2:
             print('{0}: {1}'.format(x.__class__.__name__, x), file=sys.stderr)
@@ -192,12 +200,12 @@ def main():
         else:
             raise
 
-def init_backend(db, user):
+def init_backend(db, user, readonly):
     if not backend_enabled:
         raise ImportError(backend_import_err)
 
     # Initialise the backend
-    box = StructureBox(ASEdbSQlite3Backend(database=db, user=user))
+    box = StructureBox(ASEdbSQlite3Backend(database=db, user=user, readonly=readonly))
     token = box.authenticate(Credentials(user))
 
     return box, token
@@ -253,7 +261,7 @@ def untar_and_delete(tar_files, path_prefix):
             untar_file(f, path_prefix, quiet=True)
         os.remove(tarball)
 
-def run(args, sys_args, verbosity, local, ssh, user):
+def run(args, sys_args, verbosity, local, ssh, user, readonly):
 
     def out(*args):
         '''Prints information in accordance to verbosity'''
@@ -326,7 +334,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
 
     # Remove entries from a database
     elif args.remove:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
         result = box.remove(token, query, just_one=False, 
                             confirm=args.confirm)
         print(result.msg)
@@ -345,7 +353,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
     # Extract a configuration from the database and write it
     # to the specified file.
     elif args.write_to_file:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
 
         filename = args.write_to_file
         if '.' in filename:
@@ -451,7 +459,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
     # (current directory by default), or print the file
     # to stdout.
     elif args.extract_original_files:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
 
         # If over ssh, create a tar file in memory
         if ssh and not local:
@@ -531,7 +539,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
 
     # Receive configurations via stdin and write it to the database
     elif args.store and ssh and not local:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
 
         data_in = json.loads(b64decode(sys.stdin.read()))
 
@@ -656,7 +664,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
             communicate_via_ssh(args.remote, sys_args, tty=True, data_out=data_string)
         else:
             # Write atoms to the database
-            box, token = init_backend(args.database, user)
+            box, token = init_backend(args.database, user, readonly)
             atoms_list = [dct['atoms'] for dct in parsed]
             result = box.insert(token, atoms_list, kvp)
 
@@ -666,7 +674,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
         if ssh and local:
             communicate_via_ssh(args.remote, sys_args, tty=True)
         else:
-            box, token = init_backend(args.database, user)
+            box, token = init_backend(args.database, user, readonly)
             result = box.add_keys(token, query, kvp)
             print(result.msg)
 
@@ -674,7 +682,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
         if ssh and local:
             communicate_via_ssh(args.remote, sys_args, tty=True)
         else:
-            box, token = init_backend(args.database, user)
+            box, token = init_backend(args.database, user, readonly)
             result = box.remove_keys(token, query, remove_keys)
             print(result.msg)
 
@@ -683,7 +691,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
 
     # Count selected configurations
     elif args.count:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
 
         if args.limit == 0:
             lim = 0
@@ -708,7 +716,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
         communicate_via_ssh(args.remote, sys_args, tty=True)
 
     elif args.ids:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
@@ -717,7 +725,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
 
     # Show the database
     elif args.show:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
@@ -735,7 +743,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
         return
 
     elif args.list or not args.database:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
 
         dbs = box.list(token)
         if user:
@@ -752,7 +760,7 @@ def run(args, sys_args, verbosity, local, ssh, user):
 
     # Print info about keys
     else:
-        box, token = init_backend(args.database, user)
+        box, token = init_backend(args.database, user, readonly)
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)

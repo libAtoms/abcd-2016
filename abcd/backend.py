@@ -156,3 +156,15 @@ class Cursor(object):
     @abstractmethod
     def count(self):
         pass
+
+class WriteError(Exception):
+    """Error which is thrown by the backend if write fails"""
+    def __init__(self, message):
+        self.message = message
+        super(WriteError, self).__init__(message)
+
+class ReadError(Exception):
+    """Error which is thrown by the backend if read fails"""
+    def __init__(self, message):
+        self.message = message
+        super(ReadError, self).__init__(message)

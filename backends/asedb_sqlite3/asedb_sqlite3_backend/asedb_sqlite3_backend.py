@@ -1,4 +1,4 @@
-from abcd.backend import Backend
+from abcd.backend import Backend, ReadError, WriteError
 import abcd.backend
 import abcd.results as results
 from abcd.util import get_info_and_arrays
@@ -8,93 +8,18 @@ from abcd.query import QueryError
 from ase.db import connect
 from ase.utils import plural
 from ase.atoms import Atoms
-from ase.calculators.calculator import get_calculator, all_properties
+from ase.calculators.calculator import all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
-from ase.data import chemical_symbols
+
+from mongodb2asedb import translate_query
+from util import setup, add_user, get_dbs_path, reserved_usernames
 
 import os
-from ConfigParser import SafeConfigParser
-from itertools import imap, product
+from itertools import imap
 from random import randint
 import glob
 import time
 import numpy as np
-import re
-
-CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
-AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
-FILE_NAME = os.path.basename(__file__)
-if FILE_NAME.endswith('.pyc'):
-    FILE_NAME = FILE_NAME[:-1]
-
-reserved_usernames = ['public', 'all', 'local']
-
-def get_dbs_path():
-    dbs_path = None
-    parser = SafeConfigParser()
-
-    cmd = 'python {} --setup'.format(FILE_NAME)
-
-    # Read the config file if it exists
-    if os.path.isfile(CONFIG_PATH):
-        try:
-            parser.read(CONFIG_PATH)
-            dbs_path = parser.get('ase-db', 'dbs_path')
-        except:
-            raise RuntimeError('There were problems reading {}. Did you run {}?'.format(CONFIG_PATH, cmd))
-    else:
-        raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
-    return dbs_path
-
-def interpret(key, op, val):
-    # Returns a list of ASEdb queries, where elements in this list
-    # are assumed to be ORed.
-    queries = []
-    if op == '$eq':
-        queries.append('{}={}'.format(key, val))
-    elif op == '$in':
-        if key == 'numbers':
-            if isinstance(val, list):
-                for v in val:
-                    queries.append(str(chemical_symbols[v]))
-            else:
-                queries.append(str(chemical_symbols[v]))
-        else:
-            if isinstance(val, list):
-                for v in val:
-                    queries.append('{}={}'.format(key, v))
-            else:
-                queries.append('{}={}'.format(key, v))
-    elif op == '$ne':
-        queries.append('{}!={}'.format(key, val))
-    elif op == '$nin':
-        queries.append(','.join(['{}!={}'.format(key, v) for v in val]))
-    elif op == '$gt':
-        queries.append('{}>{}'.format(key, val))
-    elif op == '$gte':
-        queries.append('{}>={}'.format(key, val))
-    elif op == '$lt':
-        queries.append('{}<{}'.format(key, val))
-    elif op == '$lte':
-        queries.append('{}<={}'.format(key, val))
-    else:
-        raise QueryError('{} {} {}'.format(key, op, val))
-
-    return queries
-
-def translate_query(query):
-    '''Translates the MongoDB query to the ASEdb query'''
-
-    asedb_queries = []
-    for single_query in query['$and']:
-        for key, dct in single_query.iteritems():
-            for op, val in dct.iteritems():
-                 asedb_queries.append(interpret(key, op, val))
-
-    # Because ASEdb doesn't understand ORs, we need to split up
-    # expressions with ORs into separate queries
-    asedb_queries = list(product(*asedb_queries))
-    return [','.join(lst) for lst in asedb_queries]
 
 class ASEdbSQlite3Backend(Backend):
 
@@ -116,15 +41,24 @@ class ASEdbSQlite3Backend(Backend):
             the connection to a database is not open.'''
         def func_wrapper(*args, **kwargs):
             if not args[0].connection:
-                raise Exception("No database is specified")
+                raise ReadError("No database is specified")
             else:
                 return func(*args, **kwargs)
         return func_wrapper
 
-    def __init__(self, database=None, user=None, password=None):
+    def read_only(func):
+        def func_wrapper(*args, **kwargs):
+            if args[0].readonly:
+                raise WriteError('No write access')
+            else:
+                return func(*args, **kwargs)
+        return func_wrapper
+
+    def __init__(self, database=None, user=None, password=None, readonly=True):
         if user == 'all':
             raise RuntimeError('Invalid username: '.format('all'))
         self.user = user
+        self.readonly = readonly
         self.dbs_path = get_dbs_path()
         self.connection = None
         self.root_dir = None
@@ -132,7 +66,7 @@ class ASEdbSQlite3Backend(Backend):
         # Check if the $databases/all directory exists.
         all_path = os.path.join(self.dbs_path, 'all')
         if not os.path.isdir(all_path):
-            cmd = 'python {} --setup'.format(FILE_NAME)
+            cmd = 'python asedb_sqlite3_backend.py --setup'
             raise RuntimeError('{} does not exist. Run "{}" first'.format(all_path, cmd))
 
         # Get the user. If the script is running locally, we have access
@@ -182,7 +116,7 @@ class ASEdbSQlite3Backend(Backend):
             raise AuthenticationError('Username "{}" is reserved'.format(credentials.username))
         return credentials.username
 
-    def connect_to_database(self, database, create_new=True):
+    def connect_to_database(self, database):
         '''
         Connnects to a database with given name. If it doesn't
         exist, a new one is created.
@@ -195,7 +129,7 @@ class ASEdbSQlite3Backend(Backend):
 
         # Look inside the root_dir to see if the datbase exists
         if not os.path.isfile(os.path.join(self.root_dir, database)):
-            if not create_new:
+            if self.readonly:
                 raise RuntimeError('Database {} does not exist'.format(database))
             else:
                 # Database does not exist. Create a new one.
@@ -215,6 +149,7 @@ class ASEdbSQlite3Backend(Backend):
             db_path = os.path.join(self.root_dir, database)
             self.connection = connect(db_path)
 
+    @read_only
     @require_database
     def insert(self, auth_token, atoms, kvp):
 
@@ -293,10 +228,12 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
         return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
 
+    @read_only
     @require_database
     def update(self, auth_token, atoms):
         return results.UpdateResult(updated_ids=[], msg='')
 
+    @read_only
     @require_database
     def remove(self, auth_token, filter, just_one, confirm):
         if just_one:
@@ -357,12 +294,14 @@ class ASEdbSQlite3Backend(Backend):
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
 
+    @read_only
     def add_keys(self, auth_token, filter, kvp):
         ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, [], **kvp)[0]
         msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))
         return results.AddKvpResult(modified_ids=[], no_of_kvp_added=n, msg=msg)
 
+    @read_only
     def remove_keys(self, auth_token, filter, keys):
         ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, keys)[1]
@@ -377,82 +316,6 @@ class ASEdbSQlite3Backend(Backend):
 
     def is_open(self):
         return True
-
-def add_user(user):
-    if user in reserved_usernames:
-        print 'Error: username "{}" is reserved'.format(user)
-        return
-    if not re.match(r'^[A-Za-z0-9_]+$', user):
-        print 'Error: username cannot contain characters which are not alphanumeric or underscores'
-        return
-
-    dbs_path = get_dbs_path()
-    user_dbs_path = os.path.join(dbs_path, user)
-
-    # Make sure ~/.ssh/authorized_keys file exists
-    ssh_dir = os.path.dirname(AUTHORIZED_KEYS)
-    if not os.path.isdir(ssh_dir):
-        os.makedirs(ssh_dir)
-        os.chmod(ssh_dir, 0700)
-    if not os.path.isfile(AUTHORIZED_KEYS):
-        open(AUTHORIZED_KEYS, 'a').close()
-        os.chmod(AUTHORIZED_KEYS, 0644)
-
-    # Add user's credentials to the authorized_keys file
-    public_key = raw_input('Enter the ssh public key for {}: '.format(user))
-    line = '\ncommand=". ~/.bash_profile && abcd --ssh --user {} ${{SSH_ORIGINAL_COMMAND}}" {}'.format(user, public_key)
-    with open(AUTHORIZED_KEYS, 'a') as f:
-        f.write(line)
-    print '  Added a key for user "{}" to {}'.format(user, AUTHORIZED_KEYS)
-
-    # Check if this user already exists
-    if os.path.isdir(user_dbs_path):
-        print '  Directory for user "{}" already exists under {}'.format(user, user_dbs_path)
-    else:
-        # Make a directory for the user
-        os.mkdir(user_dbs_path)
-        print '  Created {}'.format(user_dbs_path)
-
-def setup():
-    '''
-    Create a config file and a directory in which databases will be stored.
-    '''
-
-    # Check if the config file exists. If it doesn't, create it
-    if not os.path.isfile(CONFIG_PATH):
-        parser = SafeConfigParser()
-        parser.add_section('ase-db')
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            parser.write(cfg_file)
-
-    # Make sure appropriate sections exist
-    parser = SafeConfigParser()
-    parser.read(CONFIG_PATH)
-
-    if not parser.has_option('ase-db', 'dbs_path'):
-        if not parser.has_section('ase-db'):
-            parser.add_section('ase-db')
-        if not parser.has_option('ase-db', 'dbs_path'):
-            # Ask the user for the path to the databases folder
-            dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
-            parser.set('ase-db', 'dbs_path', dbs_path)
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            parser.write(cfg_file)
-    else:
-        dbs_path = get_dbs_path()
-        print '  Config file found at {}'.format(CONFIG_PATH)
-
-    # Path to the "all" folder
-    all_path = os.path.join(dbs_path, 'all')
-
-     # Check if the "all" directory exists. If not, create it
-    if not os.path.isdir(all_path):
-        os.makedirs(all_path)
-        print '  Created databases directory at {}'.format(dbs_path)
-        print '  Your databases will be stored in {}'.format(all_path)
-    else:
-        print '  Your databases directory already exists at {}'.format(dbs_path)
-        print '  Your databases are stored at {}'.format(all_path)
 
 if __name__ == '__main__':
     import sys
