@@ -549,9 +549,6 @@ def run(args, sys_args, verbosity, local, ssh, user):
         print_store_result(result, parsed, aux_files, args.database)
 
     elif args.store:
-        if query:
-            to_stderr('Ignoring query:', query)
-
         # Detect if the supplied arguments are directories or files
         dirs = []
         files = []
