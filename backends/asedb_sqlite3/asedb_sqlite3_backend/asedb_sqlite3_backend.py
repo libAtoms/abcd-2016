@@ -15,6 +15,7 @@ from mongodb2asedb import translate_query
 from util import setup, add_user, get_dbs_path, reserved_usernames
 
 import os
+import re
 from itertools import imap
 from random import randint
 import glob
@@ -79,7 +80,10 @@ class ASEdbSQlite3Backend(Backend):
         # root_dir is the directory in which user's databases are stored
         self.root_dir = os.path.join(self.dbs_path, home)
 
-        if database is not None:
+        # Make sure the database name is safe
+        if database is not None and database != '':
+            if not re.match(r'^[A-Za-z0-9_]+$', database):
+                raise RuntimeError('The database name can only contain alphanumeric characters and underscores.')
             self.connect_to_database(database)
 
         super(ASEdbSQlite3Backend, self).__init__()
