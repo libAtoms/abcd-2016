@@ -52,6 +52,7 @@ No install is needed when the script is to be run only remotely. To use it local
 - Download and manually install the development version of ASE from *https://wiki.fysik.dtu.dk/ase/download.html#latest-development-release* (min. version required 3.10.0.4590)
 - Change the directory to *abcd/* and run ```python setup.py install --user``` to install the abcd package. It will install the abcd tool on your system.
 - Install the backend by running its corresponding setup script in the same way. For example, if installing the ASEdb backend: ```cd backends/asedb_sqlite3 && python setup.py install --user```
+- Open ~/.abcd_config and specify your backend. The script will try to import the module using ```from <backend_module> import <backend_name>.``` For example, if using the ASEdbSQlite3 backend, the *backend\_module* field should be ```asedb_sqlite3_backend.asedb_sqlite3_backend``` and *backend\_name* should be ```ASEdbSQlite3Backend```.
 - If using the ASEdb backend, run the additional setup by executing ```python asedb_sqlite3_backend.py --setup```.
 - The script is now ready to be used. To use it, just call ```abcd```
 
