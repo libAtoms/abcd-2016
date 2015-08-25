@@ -1,9 +1,9 @@
 from abcd.backend import Backend, ReadError, WriteError
 import abcd.backend
 import abcd.results as results
-from abcd.util import get_info_and_arrays
+from abcd.util import get_info_and_arrays, atoms2dict, dict2atoms
 from abcd.authentication import AuthenticationError
-from abcd.query import QueryError
+from abcd.query import QueryError, translate
 
 from ase.db import connect
 from ase.utils import plural
@@ -21,6 +21,40 @@ from random import randint
 import glob
 import time
 import numpy as np
+
+def row2atoms(row, keys, omit_keys):
+    atoms = row.toatoms()
+
+    # Add additional info
+    atoms.info['unique_id'] = row.unique_id
+    if row._keys:
+        atoms.info.update(row.key_value_pairs)
+
+    data = row.get('data')
+    if data:
+        for (key, value) in data.items():
+            key = str(key) # avoid unicode strings
+            value = np.array(value)
+            if value.dtype.kind == 'U':
+                value = value.astype(str)
+            try:
+                atoms.new_array(key, value)
+            except (TypeError, ValueError):
+                atoms.info[key] = value
+
+    keys_to_delete = ['unique_id']
+    if keys != '++':
+        for key in atoms.info:
+            if key not in keys:
+                keys_to_delete.append(key)
+
+    for key in omit_keys:
+        keys_to_delete.append(key)
+
+    for key in keys_to_delete:
+        atoms.info.pop(key, None)
+
+    return atoms
 
 class ASEdbSQlite3Backend(Backend):
 
@@ -235,6 +269,64 @@ class ASEdbSQlite3Backend(Backend):
     @read_only
     @require_database
     def update(self, auth_token, atoms):
+        '''Takes the Atoms object or a list of Atoms objects'''
+
+        def update_atoms_dct(d1, d2):
+            # Update info and arrays
+            if 'info' in d1 and 'info' in d2:
+                d1['info'].update(d2['info'])
+            if 'arrays' in d1 and 'arrays' in d2:
+                d1['arrays'].update(d2['arrays'])
+            # Update the rest
+            for k, v in d2.iteritems():
+                if k == 'info' or k == 'arrays':
+                    continue
+                if k not in d1:
+                    d1[k] = v
+                elif v:
+                    d1[k] = v
+
+        def update_atoms(atoms):
+            '''Takes the Atoms object (not a list)'''
+
+            if 'uid' in atoms.info and atoms.info['uid'] is not None:
+                query = translate(['uid={}'.format(atoms.info['uid'])])
+                atoms_it = self.find(auth_token, query, None, False, 1, '++', [])
+
+                old_atoms = None
+                try:
+                    old_atoms = next(atoms_it)
+                except StopIteration:
+                    # Iterator is empty, this uid does not exist yet
+                    self.insert(auth_token, atoms, {})
+                    return
+
+                def print_dct(dct):
+                    for k, v in dct.iteritems():
+                        if k != 'original_file_contents':
+                            print k, v
+                    print ''
+
+                # Convert atoms to dictionaries so it's easier to update them
+                old_atoms_dct = atoms2dict(old_atoms, True)
+                new_atoms_dct = atoms2dict(atoms, True)
+
+                # Update the atoms
+                update_atoms_dct(old_atoms_dct, new_atoms_dct)
+
+                # Remove the old atoms and insert their new version
+                self.remove(auth_token, query, True, False)
+                self.insert(auth_token, dict2atoms(old_atoms_dct, True), {})
+            else:
+                self.insert(auth_token, atoms, {})
+
+        if isinstance(atoms, Atoms):
+            update_atoms(atoms)
+        else:
+            # Assume it's an iterable
+            for ats in atoms:
+                update_atoms(ats)
+
         return results.UpdateResult(updated_ids=[], msg='')
 
     @read_only
@@ -258,45 +350,10 @@ class ASEdbSQlite3Backend(Backend):
     def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
         if not sort:
             sort = 'id'
-
         rows_iter = self._select(filter, sort=sort, reverse=reverse, limit=limit)
 
-        def row2atoms(row):
-            atoms = row.toatoms()
-
-            # Add additional info
-            atoms.info['unique_id'] = row.unique_id
-            if row._keys:
-                atoms.info.update(row.key_value_pairs)
-
-            data = row.get('data')
-            if data:
-                for (key, value) in data.items():
-                    key = str(key) # avoid unicode strings
-                    value = np.array(value)
-                    if value.dtype.kind == 'U':
-                        value = value.astype(str)
-                    try:
-                        atoms.new_array(key, value)
-                    except (TypeError, ValueError):
-                        atoms.info[key] = value
-
-            keys_to_delete = ['unique_id']
-            if keys != '++':
-                for key in atoms.info:
-                    if key not in keys:
-                        keys_to_delete.append(key)
-
-            for key in omit_keys:
-                keys_to_delete.append(key)
-
-            for key in keys_to_delete:
-                atoms.info.pop(key, None)
-
-            return atoms
-
         # Convert it to the Atoms iterator.
-        return ASEdbSQlite3Backend.Cursor(imap(row2atoms, rows_iter))
+        return ASEdbSQlite3Backend.Cursor(imap(lambda x: row2atoms(x, keys, omit_keys), rows_iter))
 
     @read_only
     def add_keys(self, auth_token, filter, kvp):

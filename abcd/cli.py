@@ -125,6 +125,7 @@ def main():
     add('--no-confirm', action='store_false', dest='confirm',
         help='Don\'t ask for confirmation when removing')
     add('--store', metavar='', nargs='+', help='Store a directory / list of files')
+    add('--update', metavar='', nargs='+', help='Update the databse with a directory / list of files')
     add('--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
     add('--untar', action='store_true', default=False,
@@ -516,7 +517,7 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             out(msg)
 
     # Receive configurations via stdin and write it to the database
-    elif args.store and ssh and not local:
+    elif (args.store or args.update) and ssh and not local:
         box, token = init_backend(args.database, user, readonly)
 
         data_in = json.loads(b64decode(sys.stdin.read()))
@@ -531,20 +532,29 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             to_stderr('No atoms received')
             return
         
-        result = box.insert(token, (dct['atoms'] for dct in parsed), kvp)
-        print_store_result(result, parsed, aux_files, args.database)
+        if args.store:
+            result = box.insert(token, (dct['atoms'] for dct in parsed), kvp)
+            print_store_result(result, parsed, aux_files, args.database)
+        else:
+            result = box.update(token, (dct['atoms'] for dct in parsed))
+            print('Updated')
 
-    elif args.store:
+    elif (args.store or args.update):
+        if args.store:
+            files_args = args.store
+        else:
+            files_args = args.update
+        
         # Detect if the supplied arguments are directories or files
         dirs = []
         files = []
-        for arg in args.store:
-            if os.path.isdir(arg):
-                dirs.append(arg)
-            elif os.path.isfile(arg):
-                files.append(arg)
+        for f in files_args:
+            if os.path.isdir(f):
+                dirs.append(f)
+            elif os.path.isfile(f):
+                files.append(f)
             else:
-                raise Exception('{} does not exist'.format(arg))
+                raise Exception('{} does not exist'.format(f))
         dirs = list(set(dirs))
         files = list(set(files))
 
@@ -644,9 +654,12 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             # Write atoms to the database
             box, token = init_backend(args.database, user, readonly)
             atoms_list = [dct['atoms'] for dct in parsed]
-            result = box.insert(token, atoms_list, kvp)
-
-            print_store_result(result, parsed, aux_files, args.database)
+            if args.store:
+                result = box.insert(token, atoms_list, kvp)
+                print_store_result(result, parsed, aux_files, args.database)
+            else:
+                result = box.update(token, atoms_list)
+                print('Updated')
 
     elif args.add_keys:
         if ssh and local:
