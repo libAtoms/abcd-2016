@@ -7,6 +7,8 @@ import argparse
 import subprocess
 import tarfile
 import StringIO
+from base64 import b64encode, b64decode
+import json
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -181,9 +183,6 @@ def init_backend(db, user, readonly):
 
     # Import the backend and other external libraries
     Backend = getattr(__import__(backend_module, fromlist=[backend_name]), backend_name)
-    from base64 import b64encode, b64decode
-    import json
-
     box = StructureBox(Backend(database=db, user=user, readonly=readonly))
     token = box.authenticate(Credentials(user))
 
