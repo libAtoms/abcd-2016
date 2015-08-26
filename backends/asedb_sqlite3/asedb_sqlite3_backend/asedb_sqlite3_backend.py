@@ -253,6 +253,9 @@ class ASEdbSQlite3Backend(Backend):
                 preprocess(atoms)
                 info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
 
+                # Add kvp
+                info.update(kvp)
+
                 if exists:
                     # Remove the original configuration (it will be replaced)
                     query = translate(['uid={}'.format(atoms.info['uid'])])
