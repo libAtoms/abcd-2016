@@ -3,11 +3,13 @@
 ## Frontend
 
 * Ability to update configurations (check out, do some calculations, update the database). For this the ids need to be sorted out (configurations can be identified by their unique_id keys).
+* Remove the confirm argument from Backend.remove and move the functionality to the front-end.
+* Remove the kvp argument from Backend.insert and move the functionality to the front-end.
 * copy/move files from one database to another, including a new database
 * Modify the --store option to store together only files at the same directory level
 * --store should be able to store multiple directories at the same time (--store DIR1 DIR2 ...)
 * Ability to add keys with commas
-* Multi-column sorting on the summary table
+* Multi-column sorting on the summary table (using a dictionary where keys are column names and values are either ASCENDING or DESCENDING).
 * Add the --unique option to the command line for the summary table
 * Add the --long option to the command line that will display more information about a single sonfiguration
 * Allow different backends to be chosen without modifying the script
