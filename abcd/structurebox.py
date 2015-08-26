@@ -44,9 +44,9 @@ class StructureBox(object):
         with StructureBox.BackendOpen(self.backend):
             return self.backend.find(auth_token, filter, sort, reverse, limit, keys, omit_keys)
 
-    def remove(self, auth_token, filter, just_one=True, confirm=True):
+    def remove(self, auth_token, filter, just_one=True):
         with StructureBox.BackendOpen(self.backend):
-            return self.backend.remove(auth_token, filter, just_one, confirm)
+            return self.backend.remove(auth_token, filter, just_one)
 
     def add_keys(self, auth_token, filter, kvp):
         with StructureBox.BackendOpen(self.backend):

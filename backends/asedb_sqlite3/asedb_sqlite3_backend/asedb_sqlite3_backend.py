@@ -239,17 +239,12 @@ class ASEdbSQlite3Backend(Backend):
 
     @read_only
     @require_database
-    def remove(self, auth_token, filter, just_one, confirm):
+    def remove(self, auth_token, filter, just_one):
         if just_one:
             limit = 1
         else:
             limit = 0
         ids = [dct['id'] for dct in self._select(filter, limit=limit)]
-        if confirm:
-            msg = 'Delete {}? (yes/no): '.format(plural(len(ids), 'row'))
-            if raw_input(msg).lower() != 'yes':
-                return results.RemoveResult(removed_count=0, 
-                                            msg='Operation aborted by the user')
         self.connection.delete(ids)
         msg = 'Deleted {}'.format(plural(len(ids), 'row'))
         return results.RemoveResult(removed_count=len(ids), msg=msg)

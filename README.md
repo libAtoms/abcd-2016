@@ -21,7 +21,7 @@ You can remove it by adding the following line to the ~/.ssh/config file on your
 ### Examples of running locally
 
 - ```abcd db1.db 'energy>0.7' --count``` - count number of selected rows
-- ```abcd db1.db 'energy>0.8' --remove --no-confirmation``` - remove selected configurations, don\'t ask for confirmation
+- ```abcd db1.db 'energy>0.8' --remove``` - remove selected configurations
 - ```abcd db1.db --store conf1.xyz conf2.xyz info.txt``` - store original files in the database
 - ```abcd db1.db --store configs/``` - store the whole directory in the database
 - ```abcd db1.db --omit-keys 'key1,key2' --show``` - omit keys key1 and key2

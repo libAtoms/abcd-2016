@@ -34,7 +34,7 @@ examples = '''
     abcd abcd@gc121mac1:db1.db --extract-original-files --path-prefix extracted/   (extract original files to the extracted/ folder)
     abcd abcd@gc121mac1:db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
     abcd db1.db \'energy>0.7\' --count   (count number of selected rows)
-    abcd db1.db \'energy>0.8\' --remove --no-confirmation   (remove selected configurations, don\'t ask for confirmation)
+    abcd db1.db \'energy>0.8\' --remove   (remove selected configurations)
     abcd db1.db --store conf1.xyz conf2.xyz info.txt   (store original files in the database)
     abcd db1.db --store configs/   (store the whole directory in the database)
     abcd db1.db --omit-keys 'user,id' --show  (omit keys)
@@ -120,10 +120,6 @@ def main():
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     add('--remove', action='store_true',
         help='Remove selected rows.')
-    add('--confirm', action='store_true', default=True,
-        help='Require confrmation when removing')
-    add('--no-confirm', action='store_false', dest='confirm',
-        help='Don\'t ask for confirmation when removing')
     add('--store', metavar='', nargs='+', help='Store a directory / list of files')
     add('--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
@@ -313,8 +309,7 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
     # Remove entries from a database
     elif args.remove:
         box, token = init_backend(args.database, user, readonly)
-        result = box.remove(token, query, just_one=False, 
-                            confirm=args.confirm)
+        result = box.remove(token, query, just_one=False)
         print(result.msg)
 
     elif args.write_to_file and ssh and local:
