@@ -10,10 +10,10 @@ import numpy as np
 
 def trim(val, length):
     s = str(val)
-    if len(s) > length+1:
-        return (s[:length] + '..')
-    else:
+    if length == -1 or (len(s) <= length+1):
         return s
+    else:
+        return (s[:length] + '..')
 
 def atoms_list2dict(atoms_it):
     dicts = []
@@ -41,6 +41,8 @@ def format_value(value, key):
                 v += 'T' if a else 'F'
         else:
             v += 'T' if value else 'F'
+    elif key == 'original_file_contents':
+        v = '<file>'
     return v
 
 def filter_keys(keys_list, show_keys, omit_keys):
@@ -76,15 +78,12 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys='++', omit_keys
         print '  No keys to display'
         return
 
-    # Overwrite "truncate" if "border" is False
-    if not border:
-        truncate = False
     if truncate:
         max_title_len = 10
         max_cell_len = 8
     else:
-        max_title_len = 16
-        max_cell_len = 16
+        max_title_len = 100
+        max_cell_len = 100
 
     # Initialise the table
     headers = []
@@ -98,9 +97,12 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys='++', omit_keys
         t.padding_width = 1
         t.border = False
         t.align = 'l'
-    
+
+    # Apply special size rules to some keys    
     cell_sizes = {}
     for key in keys_list:
+        if not truncate:
+            cell_sizes[key] = max_cell_len
         if key == 'uid':
             cell_sizes[key] = 16
         elif key in ['c_time', 'm_time']:
@@ -124,17 +126,14 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys='++', omit_keys
 
     # Print the table
     s = ''
-    if not border:
-        comment = '#'
-    else:
-        comment = ''
+    comment = '' if border else '#'
 
     if no_rows > 0:
         s += comment + t.get_string() + '\n'
     s += comment + '  Rows: {}'.format(no_rows)
     print s
 
-def print_keys_table(atoms_list, show_keys='++', omit_keys=[]):
+def print_keys_table(atoms_list, border=True, truncate=True, show_keys='++', omit_keys=[]):
 
     dicts = atoms_list2dict(atoms_list)
     if len(dicts) == 0:
@@ -168,27 +167,46 @@ def print_keys_table(atoms_list, show_keys='++', omit_keys=[]):
             rang = ('...', '...')
         ranges[key] = rang
 
-    def print_table(lst, title):
-        t = PrettyTable(['Key', 'Min', 'Max'])
-        t.padding_width = 0
-        t.align['Key'] = 'l'
+    if truncate:
+        max_key_len = 40
+        max_val_len = 30
+    else:
+        max_key_len = 100
+        max_val_len = 100
 
-        print '\n', title
+    def table_string(lst):
+        t = PrettyTable(['Key', 'Min', 'Max'])
+        if border:
+            t.padding_width = 0
+            t.border = True
+            t.align['Key'] = 'l'
+        else:
+            t.padding_width = 1
+            t.border = False
+            t.align = 'l'
+
+        s = ''
         no_keys = 0
         for key in lst:
-            k = '{} ({})'.format(trim(key, 25), str(counter[key]))
+            k = '{} ({})'.format(trim(key, max_key_len), str(counter[key]))
             min_val = format_value(ranges[key][0], key)
             max_val = format_value(ranges[key][1], key)
-            row = [k, trim(min_val, 18),
-                        trim(max_val, 18)]
+            row = [k, trim(min_val, max_val_len),
+                        trim(max_val, max_val_len)]
             t.add_row(row)
             no_keys += 1
 
         if no_keys != 0:
-            print t
+            s += t.get_string()
         else:
-            print 'No keys to display'
+            s += '\nNo keys to display'
+        return s
 
-    print '\nROWS:', len(dicts)
-    print_table(intersection, 'INTERSECTION')
-    print_table(union, 'UNION')
+    comment = '' if border else '# '
+    s = ''
+    s += '\n' + comment + 'ROWS: {}'.format(len(dicts)) + '\n'
+    s += '\n' + comment + 'INTERSECTION'
+    s += '\n' + comment + table_string(intersection) + '\n'
+    s += '\n' + comment + 'UNION'
+    s += '\n' + comment + table_string(union)+ '\n'
+    print s

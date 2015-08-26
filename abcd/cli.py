@@ -707,13 +707,8 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
-
-        if keys != '++':
-            truncate = False
-        else:
-            truncate = True
         print_rows(atoms_it, border=args.pretty, 
-            truncate=truncate, show_keys=keys, omit_keys=omit_keys)
+            truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
 
     # List all available databases
     elif (args.list or not args.database) and ssh and local:
@@ -742,5 +737,6 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=args.sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
-        print_keys_table(atoms_it, show_keys=keys, omit_keys=omit_keys)
+        print_keys_table(atoms_it, border=args.pretty, 
+            truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
 
