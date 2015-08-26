@@ -32,13 +32,13 @@ class StructureBox(object):
         with StructureBox.BackendOpen(self.backend):
             return self.backend.authenticate(credentials)
 
-    def insert(self, auth_token, atoms, kvp={}):
+    def insert(self, auth_token, atoms, kvp={}, overwrite=False):
         with StructureBox.BackendOpen(self.backend):
-            return self.backend.insert(auth_token, atoms, kvp)
+            return self.backend.insert(auth_token, atoms, kvp, overwrite)
 
-    def update(self, auth_token, atoms):
+    def update(self, auth_token, atoms, upsert=False):
         with StructureBox.BackendOpen(self.backend):
-            return self.backend.update(auth_token, atoms)
+            return self.backend.update(auth_token, atoms, upsert)
 
     def find(self, auth_token, filter, sort=None, reverse=False, limit=0, keys='++', omit_keys=[]):
         with StructureBox.BackendOpen(self.backend):

@@ -189,7 +189,7 @@ class ASEdbSQlite3Backend(Backend):
 
     @read_only
     @require_database
-    def insert(self, auth_token, atoms, kvp):
+    def insert(self, auth_token, atoms, kvp, overwrite):
 
         def preprocess(atoms):
             '''
@@ -216,19 +216,24 @@ class ASEdbSQlite3Backend(Backend):
                     # Use the existing calculator
                     atoms.calc.results.update(results)
 
-        def insert_atoms(atoms, inserted_ids, skipped_ids):
+        def insert_atoms(atoms, inserted_ids, skipped_ids, replaced_ids):
             atoms.info.pop('id', None)
 
             # Check if it already exists in the database
             exists = False
             if 'uid' in atoms.info and atoms.info['uid'] is not None:
                 uid = atoms.info['uid']
+
+                # Check if this uid has already been "seen". If yes, skip it.
+                if (uid in inserted_ids) or (uid in skipped_ids) or (uid in replaced_ids):
+                    return
+
                 query = 'uid={}'.format(uid)
                 rows_it = self.connection.select(query, limit=0)
                 if sum(1 for _ in rows_it) != 0:
                     exists = True
 
-            if not exists:
+            if not exists or overwrite:
                 # Add a unique id if it's not present
                 if not 'uid' in atoms.info or atoms.info['uid'] is None:
                     atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
@@ -247,28 +252,39 @@ class ASEdbSQlite3Backend(Backend):
 
                 preprocess(atoms)
                 info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
+
+                if exists:
+                    # Remove the original configuration (it will be replaced)
+                    query = translate(['uid={}'.format(atoms.info['uid'])])
+                    self.remove(auth_token, query, True, False)
+
                 self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
-                inserted_ids.append(uid)
+
+                if exists:
+                    replaced_ids.append(uid)
+                else:
+                    inserted_ids.append(uid)
             else:
                 skipped_ids.append(uid)
 
         inserted_ids = []
         skipped_ids = []
+        replaced_ids = []
         n_atoms = 0
         if isinstance(atoms, Atoms):
-            insert_atoms(atoms, inserted_ids, skipped_ids)
+            insert_atoms(atoms, inserted_ids, skipped_ids, replaced_ids)
             n_atoms += 1
         else:
             # Assume it's an iterable
             for ats in atoms:
-                insert_atoms(ats, inserted_ids, skipped_ids)
+                insert_atoms(ats, inserted_ids, skipped_ids, replaced_ids)
                 n_atoms += 1
         msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
-        return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
+        return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, replaced_ids=replaced_ids, msg=msg)
 
     @read_only
     @require_database
-    def update(self, auth_token, atoms):
+    def update(self, auth_token, atoms, upsert):
         '''Takes the Atoms object or a list of Atoms objects'''
 
         def update_atoms_dct(d1, d2):
@@ -286,11 +302,17 @@ class ASEdbSQlite3Backend(Backend):
                 elif v:
                     d1[k] = v
 
-        def update_atoms(atoms):
+        def update_atoms(atoms, updated_ids, skipped_ids, inserted_ids):
             '''Takes the Atoms object (not a list)'''
 
             if 'uid' in atoms.info and atoms.info['uid'] is not None:
-                query = translate(['uid={}'.format(atoms.info['uid'])])
+                uid = atoms.info['uid']
+
+                # Check if this uid has already been "seen". If yes, skip it.
+                if (uid in inserted_ids) or (uid in updated_ids) or (uid in skipped_ids):
+                    return
+
+                query = translate(['uid={}'.format(uid)])
                 atoms_it = self.find(auth_token, query, None, False, 1, '++', [])
 
                 old_atoms = None
@@ -298,7 +320,11 @@ class ASEdbSQlite3Backend(Backend):
                     old_atoms = next(atoms_it)
                 except StopIteration:
                     # Iterator is empty, this uid does not exist yet
-                    self.insert(auth_token, atoms, {})
+                    if upsert:
+                        self.insert(auth_token, atoms, {}, False)
+                        inserted_ids.append(uid)
+                    else:
+                        skipped_ids.append(uid)
                     return
 
                 def print_dct(dct):
@@ -316,18 +342,30 @@ class ASEdbSQlite3Backend(Backend):
 
                 # Remove the old atoms and insert their new version
                 self.remove(auth_token, query, True, False)
-                self.insert(auth_token, dict2atoms(old_atoms_dct, True), {})
+                self.insert(auth_token, dict2atoms(old_atoms_dct, True), {}, False)
+                updated_ids.append(uid)
+            elif upsert:
+                res = self.insert(auth_token, atoms, {}, False)
+                inserted_ids.append(res.inserted_ids[0])
             else:
-                self.insert(auth_token, atoms, {})
+                # Configuration doesn't have uid
+                skipped_ids.append('(no id)')
 
+        updated_ids = []
+        skipped_ids = []
+        inserted_ids = []
+        n_atoms = 0
         if isinstance(atoms, Atoms):
-            update_atoms(atoms)
+            update_atoms(atoms, updated_ids, skipped_ids, inserted_ids)
+            n_atoms += 1
         else:
             # Assume it's an iterable
             for ats in atoms:
-                update_atoms(ats)
+                update_atoms(ats, updated_ids, skipped_ids, inserted_ids)
+                n_atoms += 1
 
-        return results.UpdateResult(updated_ids=[], msg='')
+        msg = 'Updated {}/{} configurations.'.format(len(updated_ids), n_atoms)
+        return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, inserted_ids=inserted_ids, msg=msg)
 
     @read_only
     @require_database
