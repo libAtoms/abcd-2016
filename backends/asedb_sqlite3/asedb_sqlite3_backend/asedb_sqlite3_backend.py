@@ -187,107 +187,118 @@ class ASEdbSQlite3Backend(Backend):
             db_path = os.path.join(self.root_dir, database)
             self.connection = connect(db_path)
 
+    def _preprocess(self, atoms):
+        '''
+        Load capitalised special key-value pairs into
+        a calcuator.
+        '''
+        # The id key is not used
+        atoms.info.pop('id', None)
+
+        results = {}
+        for key in atoms.info.keys():
+            if key.lower() in all_properties:
+                results[key.lower()] = atoms.info[key]
+                del atoms.info[key]
+        for key in atoms.arrays.keys():
+            if key.lower() in all_properties:
+                results[key.lower()] = atoms.arrays[key]
+                del atoms.arrays[key]
+
+        if results != {}:
+            if atoms.calc is None:
+                # Create a new calculator
+                calculator = SinglePointCalculator(atoms, **results)
+                atoms.set_calculator(calculator)
+            else:
+                # Use the existing calculator
+                atoms.calc.results.update(results)
+
+    def _insert_one_atoms(self, atoms, kvp):
+        '''
+        Inserts one Atoms object into the database, without checking if its
+        uid is already present in the database. Returns a uid of the inserted
+        object.
+        '''
+        # Add a unique id if it's not present
+        if not 'uid' in atoms.info or atoms.info['uid'] is None:
+            atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
+        uid = atoms.info['uid']
+
+        # Add a creation time if it's not present
+        if not 'c_time' in atoms.info:
+            atoms.info['c_time'] = int(time.time())
+
+        # Change the modification time
+        atoms.info['m_time'] = int(time.time())
+
+        # Update the formula and n_atoms
+        atoms.info['formula'] = atoms.get_chemical_formula()
+        atoms.info['n_atoms'] = len(atoms.numbers)
+
+        self._preprocess(atoms)
+        info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
+
+        # Add kvp to the info array
+        info.update(kvp)
+
+        # Write it to the database
+        self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
+
+        return uid
+
+    def _uid_exists(self, uid):
+        '''
+        Checks if a configuration with this uid already exists in the database.
+        '''
+        query = 'uid={}'.format(uid)
+        rows_it = self.connection.select(query, limit=1)
+        if sum(1 for _ in rows_it) != 0:
+            return True
+        else:
+            return False
+
     @read_only
     @require_database
-    def insert(self, auth_token, atoms, kvp, overwrite):
-
-        def preprocess(atoms):
-            '''
-            Load capitalised special key-value pairs into
-            a calcuator.
-            '''
-            results = {}
-
-            for key in atoms.info.keys():
-                if key.lower() in all_properties:
-                    results[key.lower()] = atoms.info[key]
-                    del atoms.info[key]
-            for key in atoms.arrays.keys():
-                if key.lower() in all_properties:
-                    results[key.lower()] = atoms.arrays[key]
-                    del atoms.arrays[key]
-
-            if results != {}:
-                if atoms.calc is None:
-                    # Create a new calculator
-                    calculator = SinglePointCalculator(atoms, **results)
-                    atoms.set_calculator(calculator)
-                else:
-                    # Use the existing calculator
-                    atoms.calc.results.update(results)
-
-        def insert_atoms(atoms, inserted_ids, skipped_ids, replaced_ids):
-            atoms.info.pop('id', None)
-
-            # Check if it already exists in the database
-            exists = False
-            if 'uid' in atoms.info and atoms.info['uid'] is not None:
-                uid = atoms.info['uid']
-
-                # Check if this uid has already been "seen". If yes, skip it.
-                if (uid in inserted_ids) or (uid in skipped_ids) or (uid in replaced_ids):
-                    return
-
-                query = 'uid={}'.format(uid)
-                rows_it = self.connection.select(query, limit=0)
-                if sum(1 for _ in rows_it) != 0:
-                    exists = True
-
-            if not exists or overwrite:
-                # Add a unique id if it's not present
-                if not 'uid' in atoms.info or atoms.info['uid'] is None:
-                    atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
-                uid = atoms.info['uid']
-
-                # Add a creation time if it's not present
-                if not 'c_time' in atoms.info:
-                    atoms.info['c_time'] = int(time.time())
-
-                # Change the modification time
-                atoms.info['m_time'] = int(time.time())
-
-                # Update the formula and n_atoms
-                atoms.info['formula'] = atoms.get_chemical_formula()
-                atoms.info['n_atoms'] = len(atoms.numbers)
-
-                preprocess(atoms)
-                info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
-
-                # Add kvp
-                info.update(kvp)
-
-                if exists:
-                    # Remove the original configuration (it will be replaced)
-                    query = translate(['uid={}'.format(atoms.info['uid'])])
-                    self.remove(auth_token, query, True, False)
-
-                self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
-
-                if exists:
-                    replaced_ids.append(uid)
-                else:
-                    inserted_ids.append(uid)
-            else:
-                skipped_ids.append(uid)
+    def insert(self, auth_token, atoms_list, kvp):
 
         inserted_ids = []
         skipped_ids = []
-        replaced_ids = []
         n_atoms = 0
-        if isinstance(atoms, Atoms):
-            insert_atoms(atoms, inserted_ids, skipped_ids, replaced_ids)
+
+        # Make sure we have a list
+        if isinstance(atoms_list, Atoms):
+            atoms_list = [atoms_list]
+
+        for atoms in atoms_list:
             n_atoms += 1
-        else:
-            # Assume it's an iterable
-            for ats in atoms:
-                insert_atoms(ats, inserted_ids, skipped_ids, replaced_ids)
-                n_atoms += 1
+
+            # Check if it already exists in the database
+            if 'uid' in atoms.info and atoms.info['uid'] is not None:
+                uid = atoms.info['uid']
+                exists = self._uid_exists(uid)
+            else:
+                uid = None
+                exists = False
+
+            # Check if this uid has already been "seen". If yes, skip it.
+            if (uid is not None) and uid in (inserted_ids + skipped_ids):
+                continue
+
+            if not exists:
+                # Insert it
+                ins_uid = self._insert_one_atoms(atoms, kvp)
+                inserted_ids.append(ins_uid)
+            else:
+                # It exists - skip it
+                skipped_ids.append(uid)
+
         msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
-        return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, replaced_ids=replaced_ids, msg=msg)
+        return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
 
     @read_only
     @require_database
-    def update(self, auth_token, atoms, upsert):
+    def update(self, auth_token, atoms_list, upsert, replace):
         '''Takes the Atoms object or a list of Atoms objects'''
 
         def update_atoms_dct(d1, d2):
@@ -305,70 +316,66 @@ class ASEdbSQlite3Backend(Backend):
                 elif v:
                     d1[k] = v
 
-        def update_atoms(atoms, updated_ids, skipped_ids, inserted_ids):
-            '''Takes the Atoms object (not a list)'''
-
-            if 'uid' in atoms.info and atoms.info['uid'] is not None:
-                uid = atoms.info['uid']
-
-                # Check if this uid has already been "seen". If yes, skip it.
-                if (uid in inserted_ids) or (uid in updated_ids) or (uid in skipped_ids):
-                    return
-
-                query = translate(['uid={}'.format(uid)])
-                atoms_it = self.find(auth_token, query, None, False, 1, '++', [])
-
-                old_atoms = None
-                try:
-                    old_atoms = next(atoms_it)
-                except StopIteration:
-                    # Iterator is empty, this uid does not exist yet
-                    if upsert:
-                        self.insert(auth_token, atoms, {}, False)
-                        inserted_ids.append(uid)
-                    else:
-                        skipped_ids.append(uid)
-                    return
-
-                def print_dct(dct):
-                    for k, v in dct.iteritems():
-                        if k != 'original_file_contents':
-                            print k, v
-                    print ''
-
-                # Convert atoms to dictionaries so it's easier to update them
-                old_atoms_dct = atoms2dict(old_atoms, True)
-                new_atoms_dct = atoms2dict(atoms, True)
-
-                # Update the atoms
-                update_atoms_dct(old_atoms_dct, new_atoms_dct)
-
-                # Remove the old atoms and insert their new version
-                self.remove(auth_token, query, True, False)
-                self.insert(auth_token, dict2atoms(old_atoms_dct, True), {}, False)
-                updated_ids.append(uid)
-            elif upsert:
-                res = self.insert(auth_token, atoms, {}, False)
-                inserted_ids.append(res.inserted_ids[0])
-            else:
-                # Configuration doesn't have uid
-                skipped_ids.append('(no id)')
-
         updated_ids = []
         skipped_ids = []
-        inserted_ids = []
+        upserted_ids = []
+        replaced_ids = []
         n_atoms = 0
-        if isinstance(atoms, Atoms):
-            update_atoms(atoms, updated_ids, skipped_ids, inserted_ids)
+
+        # Make sure it's a list
+        if isinstance(atoms_list, Atoms):
+            atoms_list = [atoms_list]
+
+        for atoms in atoms_list:
             n_atoms += 1
-        else:
-            # Assume it's an iterable
-            for ats in atoms:
-                update_atoms(ats, updated_ids, skipped_ids, inserted_ids)
-                n_atoms += 1
+
+            # Check if it already exists in the database
+            if 'uid' in atoms.info and atoms.info['uid'] is not None:
+                uid = atoms.info['uid']
+                exists = self._uid_exists(uid)
+            else:
+                uid = None
+                exists = False
+
+            # Check if this uid has already been "seen". If yes, skip it.
+            if (uid is not None) and uid in (upserted_ids + skipped_ids + updated_ids + replaced_ids):
+                continue
+
+            if not exists:
+                if upsert:
+                    # Insert it
+                    ins_uid = self._insert_one_atoms(atoms, {})
+                    upserted_ids.append(ins_uid)
+                else:
+                    # Skip it
+                    skipped_ids.append(uid)
+            else:
+                query = translate(['uid={}'.format(uid)])
+                if not replace:
+                    # Get the existing Atoms object from the database
+                    atoms_it = self.find(auth_token, query, None, False, 1, '++', [])
+                    old_atoms = next(atoms_it)
+
+                     # Convert atoms to dictionaries so it's easier to update them
+                    old_atoms_dct = atoms2dict(old_atoms, True)
+                    new_atoms_dct = atoms2dict(atoms, True)
+
+                    # Update the atoms
+                    update_atoms_dct(old_atoms_dct, new_atoms_dct)
+
+                    # Remove the old atoms and insert their new version
+                    self.remove(auth_token, query, True, False)
+                    ins_uid = self._insert_one_atoms(dict2atoms(old_atoms_dct, True), {})
+                    updated_ids.append(ins_uid)
+                else:
+                    # Replace
+                    self.remove(auth_token, query, True, False)
+                    ins_uid = self._insert_one_atoms(atoms, {})
+                    replaced_ids.append(ins_uid)
 
         msg = 'Updated {}/{} configurations.'.format(len(updated_ids), n_atoms)
-        return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, inserted_ids=inserted_ids, msg=msg)
+        return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, 
+                                    upserted_ids=upserted_ids, replaced_ids=replaced_ids, msg=msg)
 
     @read_only
     @require_database

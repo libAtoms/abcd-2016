@@ -127,10 +127,10 @@ def main():
         help='Don\'t ask for confirmation when removing')
     add('--store', metavar='', nargs='+', help='Store a directory / list of files')
     add('--update', metavar='', nargs='+', help='Update the databse with a directory / list of files')
-    add('--overwrite', action='store_true', default=False, 
-        help='Overwrite configurations with the same uid when using --store')
-    add('--no-overwrite', action='store_false', dest='overwrite', 
-        help='Don\'t overwrite configurations with the same uid when using --store')
+    add('--replace', action='store_true', default=False, 
+        help='Replace configurations with the same uid when using --update')
+    add('--no-replace', action='store_false', dest='replace', 
+        help='Don\'t replace configurations with the same uid when using --update')
     add('--upsert', action='store_true', default=False, 
         help='Insert configurations which are not yet in the database when using --update')
     add('--no-upsert', action='store_false', dest='upsert', 
@@ -252,18 +252,30 @@ def untar_and_delete(tar_files, path_prefix):
 def print_result(result, parsed, aux_files, database):
 
     if isinstance(result, UpdateResult):
-        n_succ = len(result.updated_ids)
+        n_succ = len(result.updated_ids) + len(result.upserted_ids) + len(result.replaced_ids)
 
         # Print "10 configuraions were updated:"
         n_upd = len(result.updated_ids)
-        s1 = 's' if n_upd != 1 else ''
-        s2 = 'were' if n_upd != 1 else 'was'
-        colon = ':' if n_upd != 0 else ''
-        print('{} configuration{} {} updated{}'.format(n_upd, s1, s2, colon))
+        if n_upd:
+            s1 = 's' if n_upd != 1 else ''
+            s2 = 'were' if n_upd != 1 else 'was'
+            colon = ':' if n_upd != 0 else ''
+            print('{} configuration{} {} updated{}'.format(n_upd, s1, s2, colon))
 
-        # Print ids of updated configurations
-        if n_upd != 0:
+            # Print ids of updated configurations
             for i in result.updated_ids:
+                print('  {}'.format(i))
+
+        # Print "10 configurations were replaced with --replace"
+        n_repl = len(result.replaced_ids)
+        if n_repl:
+            s1 = 's' if n_repl != 1 else ''
+            s2 = 'were' if n_repl != 1 else 'was'
+            colon = ':' if n_repl != 0 else ''
+            print('{} configuration{} {} replaced{}'.format(n_repl, s1, s2, colon))
+
+            # Print ids of replaced configurations
+            for i in result.replaced_ids:
                 print('  {}'.format(i))
 
         # Print "13 configurations were not found in the database and were not added (add with --upsert):"
@@ -279,17 +291,17 @@ def print_result(result, parsed, aux_files, database):
             for i in result.skipped_ids:
                 print('  {}'.format(i))
 
-        # Print "13 configurations were inserted into the database with --upsert:"
-        n_ins = len(result.inserted_ids)
-        if n_ins != 0:
-            s1 = 's' if n_ins != 1 else ''
-            s2 = 'were' if n_ins != 1 else 'was'
-            colon = ':' if n_ins != 0 else ''
-            print('{} configuration{} {} inserted into the database with --upsert{}'
-                .format(n_ins, s1, s2, colon))
+        # Print "13 configurations were upserted into the database with --upsert:"
+        n_ups = len(result.upserted_ids)
+        if n_ups:
+            s1 = 's' if n_ups != 1 else ''
+            s2 = 'were' if n_ups != 1 else 'was'
+            colon = ':' if n_ups != 0 else ''
+            print('{} configuration{} {} upserted into the database with --upsert{}'
+                .format(n_ups, s1, s2, colon))
 
-            # Print ids of inserted configurations
-            for i in result.inserted_ids:
+            # Print ids of upserted configurations
+            for i in result.upserted_ids:
                 print('  {}'.format(i))
 
     if isinstance(result, InsertResult):
@@ -303,38 +315,25 @@ def print_result(result, parsed, aux_files, database):
         print('{} configuration{} {} inserted{}'.format(n_ins, s1, s2, colon))
 
         # Print ids of inserted configurations
-        if n_ins != 0:
+        if n_ins:
             for i in result.inserted_ids:
                 print('  {}'.format(i))
 
-        # Print "13 configurations were found in the database and were not added (add with --overwrite):"
+        # Print "13 configurations were found in the database and were not added"
         n_sk = len(result.skipped_ids)
         if n_sk:
             s1 = 's' if n_sk != 1 else ''
             s2 = 'were' if n_sk != 1 else 'was'
             colon = ':' if n_sk != 0 else ''
-            print('{} configuration{} {} found in the database and {} not added (add with --overwrite){}'
+            print('{} configuration{} {} found in the database and {} not added{}'
                 .format(n_sk, s1, s2, s2, colon))
 
             # Print ids of skipped configurations
             for i in result.skipped_ids:
                 print('  {}'.format(i))
 
-        # Print "13 configurations were overwritten with --overwrite:"
-        n_repl = len(result.replaced_ids)
-        if n_repl != 0:
-            s1 = 's' if n_repl != 1 else ''
-            s2 = 'were' if n_repl != 1 else 'was'
-            colon = ':' if n_repl != 0 else ''
-            print('{} configuration{} {} overwritten with --overwrite{}'
-                .format(n_repl, s1, s2, colon))
-
-            # Print ids of inserted configurations
-            for i in result.replaced_ids:
-                print('  {}'.format(i))
-
     # Print info about what files were included
-    if n_succ != 0:
+    if n_succ:
         if aux_files:
             print('Original files included with each configuration:')
             for f in aux_files:
@@ -605,9 +604,9 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             return
         
         if args.store:
-            result = box.insert(token, (dct['atoms'] for dct in parsed), kvp, args.overwrite)
+            result = box.insert(token, (dct['atoms'] for dct in parsed), kvp)
         else:
-            result = box.update(token, (dct['atoms'] for dct in parsed), args.upsert)
+            result = box.update(token, (dct['atoms'] for dct in parsed), args.upsert, args.replace)
         print_result(result, parsed, aux_files, args.database)
 
     elif (args.store or args.update):
@@ -726,9 +725,9 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             box, token = init_backend(args.database, user, readonly)
             atoms_list = [dct['atoms'] for dct in parsed]
             if args.store:
-                result = box.insert(token, atoms_list, kvp, args.overwrite)
+                result = box.insert(token, atoms_list, kvp)
             else:
-                result = box.update(token, atoms_list, args.upsert)
+                result = box.update(token, atoms_list, args.upsert, args.replace)
             print_result(result, parsed, aux_files, args.database)
 
     elif args.add_keys:
