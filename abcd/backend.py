@@ -56,7 +56,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def update(self, auth_token, atoms):
+    def update(self, auth_token, atoms, upsert, replace):
         '''
         Take the atoms object and find an entry in the database with 
         the same unique id. If one exists, the old entry gets updated 
@@ -65,6 +65,8 @@ class Backend(object):
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable
+        :param bool upsert: Insert configurations even if they don't correspond to any existing ones
+        :param bool replace: If a given configuration already exists, replace it
         :return:
         :rtype: UpdateResult
         '''

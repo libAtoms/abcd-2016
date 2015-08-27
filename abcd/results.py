@@ -41,13 +41,28 @@ class InsertResult(Result):
         return self._skipped_ids
 
 class UpdateResult(Result):
-    def __init__(self, updated_ids, msg=None):
+    def __init__(self, updated_ids, skipped_ids, upserted_ids, replaced_ids, msg=None):
         self._updated_ids = updated_ids
+        self._skipped_ids = skipped_ids
+        self._upserted_ids = upserted_ids
+        self._replaced_ids = replaced_ids
         super(UpdateResult, self).__init__(msg)
 
     @property
     def updated_ids(self):
         return self._updated_ids
+
+    @property
+    def skipped_ids(self):
+        return self._skipped_ids
+
+    @property
+    def upserted_ids(self):
+        return self._upserted_ids
+
+    @property
+    def replaced_ids(self):
+        return self._replaced_ids
 
 class AddKvpResult(Result):
     def __init__(self, modified_ids, no_of_kvp_added, msg=None):
