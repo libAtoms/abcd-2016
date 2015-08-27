@@ -168,8 +168,8 @@ def print_keys_table(atoms_list, border=True, truncate=True, show_keys='++', omi
         ranges[key] = rang
 
     if truncate:
-        max_key_len = 40
-        max_val_len = 30
+        max_key_len = 50
+        max_val_len = 40
     else:
         max_key_len = 100
         max_val_len = 100

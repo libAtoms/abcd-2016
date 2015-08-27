@@ -364,7 +364,7 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
     kvp = {}
     if args.add_keys:
         for pair in args.add_keys.split(','):
-            k, v = pair.split('=')
+            k, sep, v = pair.partition('=')
             kvp[k] = convert_str_to_float_or_str(v)
 
     # Get keys to be removed
