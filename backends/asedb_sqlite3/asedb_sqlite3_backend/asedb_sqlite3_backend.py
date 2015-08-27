@@ -364,12 +364,12 @@ class ASEdbSQlite3Backend(Backend):
                     update_atoms_dct(old_atoms_dct, new_atoms_dct)
 
                     # Remove the old atoms and insert their new version
-                    self.remove(auth_token, query, True, False)
+                    self.remove(auth_token, query, True)
                     ins_uid = self._insert_one_atoms(dict2atoms(old_atoms_dct, True), {})
                     updated_ids.append(ins_uid)
                 else:
                     # Replace
-                    self.remove(auth_token, query, True, False)
+                    self.remove(auth_token, query, True)
                     ins_uid = self._insert_one_atoms(atoms, {})
                     replaced_ids.append(ins_uid)
 
