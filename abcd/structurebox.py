@@ -32,9 +32,9 @@ class StructureBox(object):
         with StructureBox.BackendOpen(self.backend):
             return self.backend.authenticate(credentials)
 
-    def insert(self, auth_token, atoms, kvp={}):
+    def insert(self, auth_token, atoms):
         with StructureBox.BackendOpen(self.backend):
-            return self.backend.insert(auth_token, atoms, kvp)
+            return self.backend.insert(auth_token, atoms)
 
     def update(self, auth_token, atoms, upsert=False, replace=False):
         with StructureBox.BackendOpen(self.backend):

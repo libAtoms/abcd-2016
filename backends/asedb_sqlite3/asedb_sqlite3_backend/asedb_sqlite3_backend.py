@@ -214,7 +214,7 @@ class ASEdbSQlite3Backend(Backend):
                 # Use the existing calculator
                 atoms.calc.results.update(results)
 
-    def _insert_one_atoms(self, atoms, kvp):
+    def _insert_one_atoms(self, atoms):
         '''
         Inserts one Atoms object into the database, without checking if its
         uid is already present in the database. Returns a uid of the inserted
@@ -239,9 +239,6 @@ class ASEdbSQlite3Backend(Backend):
         self._preprocess(atoms)
         info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
 
-        # Add kvp to the info array
-        info.update(kvp)
-
         # Write it to the database
         self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
 
@@ -260,7 +257,7 @@ class ASEdbSQlite3Backend(Backend):
 
     @read_only
     @require_database
-    def insert(self, auth_token, atoms_list, kvp):
+    def insert(self, auth_token, atoms_list):
 
         inserted_ids = []
         skipped_ids = []
@@ -287,7 +284,7 @@ class ASEdbSQlite3Backend(Backend):
 
             if not exists:
                 # Insert it
-                ins_uid = self._insert_one_atoms(atoms, kvp)
+                ins_uid = self._insert_one_atoms(atoms)
                 inserted_ids.append(ins_uid)
             else:
                 # It exists - skip it

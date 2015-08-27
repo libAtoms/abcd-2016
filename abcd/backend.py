@@ -40,7 +40,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def insert(self, auth_token, atoms, kvp):
+    def insert(self, auth_token, atoms):
         """
         Take the Atoms object or an iterable to the Atoms and insert it
         to the database
@@ -48,7 +48,6 @@ class Backend(object):
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable
-        :param dict kvp: Key-value pairs to be added
         :return: Returns a result that holds a list of ids at which 
             the objects were inserted and a message
         :rtype: InsertResult
