@@ -341,7 +341,7 @@ class ASEdbSQlite3Backend(Backend):
             if not exists:
                 if upsert:
                     # Insert it
-                    ins_uid = self._insert_one_atoms(atoms, {})
+                    ins_uid = self._insert_one_atoms(atoms)
                     upserted_ids.append(ins_uid)
                 else:
                     # Skip it
@@ -362,12 +362,12 @@ class ASEdbSQlite3Backend(Backend):
 
                     # Remove the old atoms and insert their new version
                     self.remove(auth_token, query, True)
-                    ins_uid = self._insert_one_atoms(dict2atoms(old_atoms_dct, True), {})
+                    ins_uid = self._insert_one_atoms(dict2atoms(old_atoms_dct, True))
                     updated_ids.append(ins_uid)
                 else:
                     # Replace
                     self.remove(auth_token, query, True)
-                    ins_uid = self._insert_one_atoms(atoms, {})
+                    ins_uid = self._insert_one_atoms(atoms)
                     replaced_ids.append(ins_uid)
 
         msg = 'Updated {}/{} configurations.'.format(len(updated_ids), n_atoms)
