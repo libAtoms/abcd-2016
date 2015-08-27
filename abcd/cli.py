@@ -599,7 +599,7 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         
         if args.store:
             # Attach key-value pairs to atoms and store them
-            atoms_list = [dct[atoms] for dct in parsed]
+            atoms_list = [dct['atoms'] for dct in parsed]
             for atoms in atoms_list:
                 atoms.info.update(kvp)
             result = box.insert(token, atoms_list)
@@ -724,10 +724,9 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             atoms_list = [dct['atoms'] for dct in parsed]
             if args.store:
                 # Attach key-value pairs to atoms and store them
-                atoms_list = [dct[atoms] for dct in parsed]
                 for atoms in atoms_list:
                     atoms.info.update(kvp)
-                result = box.insert(token, atoms_list, kvp)
+                result = box.insert(token, atoms_list)
             else:
                 result = box.update(token, atoms_list, args.upsert, args.replace)
             print_result(result, parsed, aux_files, args.database)
