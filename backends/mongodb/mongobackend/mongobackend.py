@@ -5,6 +5,7 @@ __author__ = 'Martin Uhrin'
 import numpy as np
 from pymongo import MongoClient
 from pymongo.son_manipulator import SONManipulator
+from pyongo.objectid import ObjectId
 import ase.atoms
 import ase.db.row
 
@@ -60,11 +61,13 @@ class MongoDBBackend(Backend):
 
         self.db.add_son_manipulator(MongoDBBackend.Transform())
 
-
     def authenticate(self, credentials):
         return authentication.AuthToken(credentials.username)
 
-    def insert(self, auth_token, atoms):
+    def list(self, auth_token):
+        return self.db.collection_names(False)
+
+    def insert(self, auth_token, atoms, kvp):
         ids = []
         if isinstance(atoms, ase.atoms.Atoms):
             # We're just inserting one
@@ -76,12 +79,42 @@ class MongoDBBackend(Backend):
 
         return results.InsertResult(ids)
 
-    def remove(self, auth_token, filter, just_one):
+    def update(self, auth_token, atoms):
+        if 'uid' not in atoms.info:
+            return results.UpdateResult(None, "Cannot update a structure"
+                                              "without a valid uid")
+        uid = atoms.info.uid
+        doc = util.atoms2dict(atoms)
+        self.collection.update({'_id': ObjectId(uid)},
+                               {'$set': doc})
+
+        return results.UpdateResult([uid])
+
+    def remove(self, auth_token, filter, just_one, confirm):
         return results.RemoveResult(self.collection.remove(
             filter, multi=not just_one)["n"])
 
-    def find(self, auth_token, filter):
-        return MongoDBBackend.Cursor(self.collection.find(filter))
+    def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
+        cur = self.collection.find(filter)
+        if sort:
+            cur.sort({sort: 1})
+        if limit:
+            cur.limit(limit)
+        return MongoDBBackend.Cursor(cur)
+
+    def add_keys(self, auth_token, filter, kvp):
+        modified = [str(doc['_id']) for doc in self.collection.find(filter)]
+        self.collection.update(filter,
+                               {'$set': kvp},
+                               {'multi': True})
+        return results.AddKvpResult(modified, len(kvp))
+
+    def remove_keys(self, auth_token, filter, keys):
+        modified = [str(doc['_id']) for doc in self.collection.find(filter)]
+        self.collection.update(filter,
+                               {'$unset': {k: "" for k in keys}},
+                               {'multi': True})
+        return results.RemoveKeysResult(modified, len(keys))
 
     def open(self):
         pass

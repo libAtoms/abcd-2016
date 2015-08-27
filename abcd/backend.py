@@ -57,7 +57,7 @@ class Backend(object):
 
     @abstractmethod
     def update(self, auth_token, atoms):
-        '''
+        """
         Take the atoms object and find an entry in the database with 
         the same unique id. If one exists, the old entry gets updated 
         with the new entry.
@@ -67,7 +67,7 @@ class Backend(object):
         :type atoms: Atoms or Atoms iterable
         :return:
         :rtype: UpdateResult
-        '''
+        """
         pass
 
     @abstractmethod
@@ -157,11 +157,13 @@ class Cursor(object):
     def count(self):
         pass
 
+
 class WriteError(Exception):
     """Error which is thrown by the backend if write fails"""
     def __init__(self, message):
         self.message = message
         super(WriteError, self).__init__(message)
+
 
 class ReadError(Exception):
     """Error which is thrown by the backend if read fails"""
