@@ -40,7 +40,7 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def insert(self, auth_token, atoms, kvp):
+    def insert(self, auth_token, atoms):
         """
         Take the Atoms object or an iterable to the Atoms and insert it
         to the database
@@ -48,7 +48,6 @@ class Backend(object):
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable
-        :param dict kvp: Key-value pairs to be added
         :return: Returns a result that holds a list of ids at which 
             the objects were inserted and a message
         :rtype: InsertResult
@@ -56,22 +55,24 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def update(self, auth_token, atoms):
+    def update(self, auth_token, atoms, upsert, replace):
         """
-        Take the atoms object and find an entry in the database with 
+        Take the atoms object and find an entry in the database with
         the same unique id. If one exists, the old entry gets updated 
         with the new entry.
 
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable
+        :param bool upsert: Insert configurations even if they don't correspond to any existing ones
+        :param bool replace: If a given configuration already exists, replace it
         :return:
         :rtype: UpdateResult
         """
         pass
 
     @abstractmethod
-    def remove(self, auth_token, filter, just_one, confirm):
+    def remove(self, auth_token, filter, just_one):
         """
         Remove entries from the databse that match the filter
 
@@ -79,7 +80,6 @@ class Backend(object):
         :param filter: Filter (in MongoDB query language)
         :type filter: dictionary?
         :param bool just_one: remove not more than one entry
-        :param bool confirm: confirm before removing
         :return: Returns a result that holds the number of removed
             entries and a message
         :rtype: RemoveResult
