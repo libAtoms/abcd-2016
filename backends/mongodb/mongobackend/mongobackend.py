@@ -5,7 +5,7 @@ __author__ = 'Martin Uhrin'
 import numpy as np
 from pymongo import MongoClient
 from pymongo.son_manipulator import SONManipulator
-from pyongo.objectid import ObjectId
+from pymongo.objectid import ObjectId
 import ase.atoms
 import ase.db.row
 
