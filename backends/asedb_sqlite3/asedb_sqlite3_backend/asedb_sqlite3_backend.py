@@ -12,7 +12,8 @@ from ase.calculators.calculator import all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
 
 from mongodb2asedb import translate_query
-from util import setup, add_user, get_dbs_path, reserved_usernames
+from util import get_dbs_path, reserved_usernames
+from remote import communicate_with_remote
 
 import os
 import re
@@ -21,6 +22,8 @@ from random import randint
 import glob
 import time
 import numpy as np
+import json
+from base64 import b64encode
 
 def row2atoms(row, keys, omit_keys):
     atoms = row.toatoms()
@@ -43,7 +46,7 @@ def row2atoms(row, keys, omit_keys):
                 atoms.info[key] = value
 
     keys_to_delete = ['unique_id']
-    if keys != '++':
+    if keys != []:
         for key in atoms.info:
             if key not in keys:
                 keys_to_delete.append(key)
@@ -81,28 +84,14 @@ class ASEdbSQlite3Backend(Backend):
                 return func(*args, **kwargs)
         return func_wrapper
 
-    def read_only(func):
-        def func_wrapper(*args, **kwargs):
-            if args[0].readonly:
-                raise WriteError('No write access')
-            else:
-                return func(*args, **kwargs)
-        return func_wrapper
-
-    def __init__(self, database=None, user=None, password=None, readonly=True):
+    def __init__(self, database=None, user=None, password=None, remote=None):
         if user == 'all':
             raise RuntimeError('Invalid username: '.format('all'))
         self.user = user
-        self.readonly = readonly
         self.dbs_path = get_dbs_path()
         self.connection = None
         self.root_dir = None
-
-        # Check if the $databases/all directory exists.
-        all_path = os.path.join(self.dbs_path, 'all')
-        if not os.path.isdir(all_path):
-            cmd = 'python asedb_sqlite3_backend.py --setup'
-            raise RuntimeError('{} does not exist. Run "{}" first'.format(all_path, cmd))
+        self.remote = remote
 
         # Get the user. If the script is running locally, we have access
         # to all databases.
@@ -114,16 +103,31 @@ class ASEdbSQlite3Backend(Backend):
         # root_dir is the directory in which user's databases are stored
         self.root_dir = os.path.join(self.dbs_path, home)
 
-        # Make sure the database name is safe
-        if database is not None and database != '':
-            if not re.match(r'^[A-Za-z0-9_]+$', database):
+        # Make sure the database name is safe and connect to it
+        self.database = database
+        if self.database:
+            self.database = os.path.basename(self.database)
+            if self.database.endswith('.db'):
+                self.database = self.database[:-3]
+            if not re.match(r'^[A-Za-z0-9_]+$', self.database):
                 raise RuntimeError('The database name can only contain alphanumeric characters and underscores.')
-            self.connect_to_database(database)
+            self.database = self.database + '.db'
+            self.connect_to_database()
+
+        # Check if the $databases/all directory exists.
+        all_path = os.path.join(self.dbs_path, 'all')
+        if not os.path.isdir(all_path):
+            cmd = 'python asedb_sqlite3_backend.py --setup'
+            raise RuntimeError('{} does not exist. Run "{}" first'.format(all_path, cmd))
 
         super(ASEdbSQlite3Backend, self).__init__()
 
-    def _select(self, query, sort=None, reverse=False, limit=0):
+    def _select(self, query, sort=[], reverse=False, limit=0):
         query = translate_query(query)
+        if sort == []:
+            sort = 'id'
+        else:
+            sort = sort[0]
         rows = []
         ids = []
         for q in query:
@@ -146,7 +150,10 @@ class ASEdbSQlite3Backend(Backend):
             return rows
 
     def list(self, auth_token):
-        dbs = glob.glob(os.path.join(self.root_dir, '*.db'))
+        if self.remote:
+            dbs = communicate_with_remote(self.remote, 'list')
+        else:
+            dbs = glob.glob(os.path.join(self.root_dir, '*.db'))
         return [os.path.basename(db) for db in dbs]
 
     def authenticate(self, credentials):
@@ -154,37 +161,29 @@ class ASEdbSQlite3Backend(Backend):
             raise AuthenticationError('Username "{}" is reserved'.format(credentials.username))
         return credentials.username
 
-    def connect_to_database(self, database):
+    def connect_to_database(self):
         '''
         Connnects to a database with given name. If it doesn't
         exist, a new one is created.
         '''
-        if '.db' not in database:
-            database += '.db'
-
-        # For security reasons
-        database = os.path.basename(database)
 
         # Look inside the root_dir to see if the datbase exists
-        if not os.path.isfile(os.path.join(self.root_dir, database)):
-            if self.readonly:
-                raise RuntimeError('Database {} does not exist'.format(database))
+        if not os.path.isfile(os.path.join(self.root_dir, self.database)):
+            # Database does not exist. Create a new one.
+            if self.user:
+                new_db_name = '_' + self.user + '_' + self.database
             else:
-                # Database does not exist. Create a new one.
-                if self.user:
-                    new_db_name = '_' + self.user + '_' + database
-                else:
-                    new_db_name = database
-                new_db_path = os.path.join(self.dbs_path, 'all', new_db_name)
-                self.connection = connect(new_db_path)
+                new_db_name = self.database
+            new_db_path = os.path.join(self.dbs_path, 'all', new_db_name)
+            self.connection = connect(new_db_path)
 
-                # Create a symlink
-                if self.user:
-                    user_db_path = os.path.join(self.root_dir, database)
-                    os.symlink(new_db_path, user_db_path)
+            # Create a symlink
+            if self.user:
+                user_db_path = os.path.join(self.root_dir, self.database)
+                os.symlink(new_db_path, user_db_path)
         else:
             # Database exists. Connect to it.
-            db_path = os.path.join(self.root_dir, database)
+            db_path = os.path.join(self.root_dir, self.database)
             self.connection = connect(db_path)
 
     def _preprocess(self, atoms):
@@ -255,17 +254,22 @@ class ASEdbSQlite3Backend(Backend):
         else:
             return False
 
-    @read_only
     @require_database
     def insert(self, auth_token, atoms_list):
-
-        inserted_ids = []
-        skipped_ids = []
-        n_atoms = 0
 
         # Make sure we have a list
         if isinstance(atoms_list, Atoms):
             atoms_list = [atoms_list]
+
+        if self.remote:
+            dcts_list = [atoms2dict(atoms, True) for atoms in atoms_list]
+            data = b64encode(json.dumps(dcts_list))
+            cmd = 'insert {} {}'.format(self.database, data)
+            return communicate_with_remote(self.remote, cmd)
+
+        inserted_ids = []
+        skipped_ids = []
+        n_atoms = 0
 
         for atoms in atoms_list:
             n_atoms += 1
@@ -293,10 +297,23 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
         return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
 
-    @read_only
     @require_database
     def update(self, auth_token, atoms_list, upsert, replace):
         '''Takes the Atoms object or a list of Atoms objects'''
+
+        # Make sure it's a list
+        if isinstance(atoms_list, Atoms):
+            atoms_list = [atoms_list]
+
+        if self.remote:
+            dcts_list = [atoms2dict(atoms, True) for atoms in atoms_list]
+            data = b64encode(json.dumps(dcts_list))
+            cmd = 'update {} {}'.format(self.database, data)
+            if upsert:
+                cmd += ' --upsert'
+            if replace:
+                cmd += ' --replace'
+            return communicate_with_remote(self.remote, cmd)
 
         def update_atoms_dct(d1, d2):
             # Update info and arrays
@@ -318,10 +335,6 @@ class ASEdbSQlite3Backend(Backend):
         upserted_ids = []
         replaced_ids = []
         n_atoms = 0
-
-        # Make sure it's a list
-        if isinstance(atoms_list, Atoms):
-            atoms_list = [atoms_list]
 
         for atoms in atoms_list:
             n_atoms += 1
@@ -350,7 +363,7 @@ class ASEdbSQlite3Backend(Backend):
                 query = translate(['uid={}'.format(uid)])
                 if not replace:
                     # Get the existing Atoms object from the database
-                    atoms_it = self.find(auth_token, query, None, False, 1, '++', [])
+                    atoms_it = self.find(auth_token, query, None, False, 1, [], [])
                     old_atoms = next(atoms_it)
 
                      # Convert atoms to dictionaries so it's easier to update them
@@ -374,9 +387,15 @@ class ASEdbSQlite3Backend(Backend):
         return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, 
                                     upserted_ids=upserted_ids, replaced_ids=replaced_ids, msg=msg)
 
-    @read_only
     @require_database
     def remove(self, auth_token, filter, just_one):
+
+        if self.remote:
+            cmd = 'remove {} {}'.format(self.database, b64encode(json.dumps(filter)))
+            if just_one:
+                cmd += ' --just-one'
+            return communicate_with_remote(self.remote, cmd)
+
         if just_one:
             limit = 1
         else:
@@ -388,22 +407,47 @@ class ASEdbSQlite3Backend(Backend):
 
     @require_database
     def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
-        if not sort:
-            sort = 'id'
+
+        if self.remote:
+            filter_out = b64encode(json.dumps(filter))
+            sort_out = b64encode(json.dumps(sort))
+            keys_out = b64encode(json.dumps(keys))
+            omit_keys_out = b64encode(json.dumps(omit_keys))
+
+            cmd = 'find {} {}'.format(self.database, filter_out)
+            cmd += ' --sort {}'.format(sort_out)
+            if reverse:
+                cmd += ' --reverse'
+            cmd += ' --limit {}'.format(limit)
+            cmd += ' --keys {}'.format(keys_out)
+            cmd += ' --omit-keys {}'.format(omit_keys_out)
+            atoms_dcts_list = communicate_with_remote(self.remote, cmd)
+            return [dict2atoms(dct, True) for dct in atoms_dcts_list]
+
         rows_iter = self._select(filter, sort=sort, reverse=reverse, limit=limit)
 
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(lambda x: row2atoms(x, keys, omit_keys), rows_iter))
 
-    @read_only
     def add_keys(self, auth_token, filter, kvp):
+
+        if self.remote:
+            cmd = 'add-keys {} {} {}'.format(self.database, b64encode(json.dumps(filter)), 
+                    b64encode(json.dumps(kvp)))
+            return communicate_with_remote(self.remote, cmd)
+
         ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, [], **kvp)[0]
         msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))
         return results.AddKvpResult(modified_ids=[], no_of_kvp_added=n, msg=msg)
 
-    @read_only
     def remove_keys(self, auth_token, filter, keys):
+        
+        if self.remote:
+            cmd = 'remove-keys {} {} {}'.format(self.database, b64encode(json.dumps(filter)), 
+                    b64encode(json.dumps(keys)))
+            return communicate_with_remote(self.remote, cmd)
+
         ids = [dct['id'] for dct in self._select(filter)]
         n = self.connection.update(ids, keys)[1]
         msg = 'Removed {} keys in total from {} configurations'.format(n, len(ids))
@@ -417,14 +461,3 @@ class ASEdbSQlite3Backend(Backend):
 
     def is_open(self):
         return True
-
-if __name__ == '__main__':
-    import sys
-    args = sys.argv[1:]
-
-    if args[0] == '--setup' and len(args) == 1:
-        setup()
-    elif args[0] == '--add-user' and len(args) == 2:
-        add_user(args[1])
-    else:
-        print 'Usage: python asedb_sqlite3_backend.py --setup / --add-user USER'

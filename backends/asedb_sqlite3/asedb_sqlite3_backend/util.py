@@ -11,7 +11,7 @@ def get_dbs_path():
     dbs_path = None
     parser = SafeConfigParser()
 
-    cmd = 'python asedb_sqlite3_backend.py --setup'
+    cmd = 'abcd-asedb --setup'
 
     # Read the config file if it exists
     if os.path.isfile(CONFIG_PATH):
@@ -44,24 +44,9 @@ def add_user(user):
         open(AUTHORIZED_KEYS, 'a').close()
         os.chmod(AUTHORIZED_KEYS, 0644)
 
-    write_access = False
-    while True:
-        user_input = raw_input('Write access (yes/no): ')
-        if user_input == 'yes':
-            write_access = True
-            break
-        elif user_input == 'no':
-            break
-        else:
-            print 'Type in "yes" or "no"'
-    if write_access:
-        readonly_flag = ''
-    else:
-        readonly_flag = '--readonly'
-
     # Add user's credentials to the authorized_keys file
     public_key = raw_input('Enter the ssh public key for {}: '.format(user))
-    line = '\ncommand=". ~/.bash_profile && abcd --ssh {} --user {} ${{SSH_ORIGINAL_COMMAND}}" {}'.format(readonly_flag, user, public_key)
+    line = '\ncommand=". ~/.bash_profile && abcd-asedb-server {} ${{SSH_ORIGINAL_COMMAND}}" {}'.format(user, public_key)
     with open(AUTHORIZED_KEYS, 'a') as f:
         f.write(line)
     print '  Added a key for user "{}" to {}'.format(user, AUTHORIZED_KEYS)
@@ -114,3 +99,19 @@ def setup():
     else:
         print '  Your databases directory already exists at {}'.format(dbs_path)
         print '  Your databases are stored at {}'.format(all_path)
+
+def print_usage():
+    print 'Usage: abcd-asedb --setup / --add-user USER'
+
+def main():
+    import sys
+    args = sys.argv[1:]
+
+    if len(args) == 0:
+        print_usage()
+    elif args[0] == '--setup' and len(args) == 1:
+        setup()
+    elif args[0] == '--add-user' and len(args) == 2:
+        add_user(args[1])
+    else:
+        print_usage()
