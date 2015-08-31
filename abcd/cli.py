@@ -602,7 +602,6 @@ def run(args, sys_args, verbosity):
             count = str(count)
         print('Found:', count)
 
-
     elif args.ids:
         atoms_it = box.find(auth_token=token, filter=query, 
                             sort=sort, reverse=args.reverse,
@@ -620,17 +619,12 @@ def run(args, sys_args, verbosity):
 
     elif args.list or not args.database:
         dbs = box.list(token)
-        if user:
-            username = user
-        else:
-            username = 'Local User'
         if dbs:
-            print(('Hello, {}. Databases you have access to:').format(username))
+            print('Hello. Databases you have access to:')
             for db in dbs:
                 print('   {}'.format(db))
         else:
-            print(('Hello, {}. You don\'t have access to any databases.').format(username))
-        return
+            print('Hello. You don\'t have access to any databases.')
 
     # Print info about keys
     else:
@@ -639,4 +633,3 @@ def run(args, sys_args, verbosity):
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         print_keys_table(atoms_it, border=args.pretty, 
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
-
