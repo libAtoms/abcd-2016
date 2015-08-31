@@ -45,12 +45,12 @@ class UsernameAndPassword(Credentials):
         # visible during debugging etc.
         # WARNING: This provides no security, just mild obfuscation from a
         # glancing user
-        self.password = base64.b64encode(password)
+        self._password = base64.b64encode(password)
         super(Credentials, UsernameAndPassword).__init__(username)
 
     @property
     def password(self):
-        return base64.b64decode(self.password)
+        return base64.b64decode(self._password)
 
 
 class AuthenticationError(Exception):

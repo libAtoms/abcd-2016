@@ -3,11 +3,9 @@ from __future__ import print_function
 import os
 import sys
 import argparse
-import subprocess
 import tarfile
 import StringIO
 from base64 import b64encode, b64decode
-import json
 
 from ase.utils import plural
 from ase.io import read as ase_read
@@ -22,7 +20,6 @@ from authentication import Credentials
 from query import translate
 from results import UpdateResult, InsertResult
 from table import print_keys_table, print_rows
-from util import atoms2dict, dict2atoms
 from config import read_config_file, create_config_file, config_file_exists
 
 description = ''
@@ -45,46 +42,19 @@ def main():
     if isinstance(sys_args, str):
         sys_args = sys_args.split(' ')
 
-    # Detect whether the script is running locallly or not
-    # and get the username
-    if '--ssh' in sys_args:
-        # Running on the remote computer
-        local = False
-        sys_args.remove('--ssh')
-
-        # Get the username
-        if '--user' in sys_args:
-            idx = sys_args.index('--user')
-            user = sys_args[idx + 1]
-            sys_args = sys_args[:idx] + sys_args[idx + 2:]
-        else:
-            user = 'public'
-
-        # Get the access mode
-        if '--readonly' in sys_args:
-            readonly = True
-            sys_args.remove('--readonly')
-        else:
-            readonly = False
-    else:
-        local = True
-        user = None
-        readonly = False
-
     if not config_file_exists():
         create_config_file()
 
-    if local:
-        # Load the options from the config file. Push them to the front of the list
-        # so they will be overwritten on the command line.
-        cfg_options = read_config_file().get('abcd', 'opts')
-        new_args = []
-        if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
-            cfg_options = cfg_options[1:-1]
-        for opt in cfg_options.split(' '):
-            if opt:
-                new_args.append(opt)
-        sys_args = new_args + sys_args
+    # Load the options from the config file. Push them to the front of the list
+    # so they will be overwritten on the command line.
+    cfg_options = read_config_file().get('abcd', 'opts')
+    new_args = []
+    if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
+        cfg_options = cfg_options[1:-1]
+    for opt in cfg_options.split(' '):
+        if opt:
+            new_args.append(opt)
+    sys_args = new_args + sys_args
 
     parser = argparse.ArgumentParser(usage = 'Usage: abcd [db-name] [selection] [options]',
                         description = description,
@@ -98,6 +68,8 @@ def main():
     add = parser.add_argument
     add('database', nargs='?', help = 'Specify the database')
     add('query', nargs = '*', default = '', help = 'Query')
+    add('--user', nargs='*', default=None, help='User')
+    add('--password', nargs='*', default=None, help='Password')
     add('--verbose', action='store_true', default=False)
     add('--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
@@ -109,12 +81,12 @@ def main():
     add('--limit', type=int, default=0, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
-    add('--sort', metavar='COL', default=None,
+    add('--sort', metavar='COL', default='',
         help='Specify the column to sort the rows by. Default is increasing order \n(change it using --reverse)')
     add('--reverse', action='store_true', default=False, help='Reverses the sorting order')
     add('--count', action='store_true',
         help='Count number of selected rows.')
-    add('--keys', default='++', help='Select only specified keys')
+    add('--keys', default='', help='Select only specified keys')
     add('--omit-keys', default='', help='Don\'t select these keys')
     add('--add-keys', metavar='{K1=V1,...}', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
@@ -152,70 +124,17 @@ def main():
         args.remote = remote
         args.database = database
 
-    # For running locally: decide whether the script will open connection
-    # to the remote and or run purely locally
-    if local:
-        if args.remote is not None:
-            # Will communicate with remote
-            ssh = True
-        else:
-            # Running entirely locally
-            ssh = False
-    else:
-        ssh = True
-
     # Calculate the verbosity
     verbosity = 1 - args.quiet + args.verbose
 
     try:
-        run(args, sys_args, verbosity, local, ssh, user, readonly)
+        run(args, sys_args, verbosity)
     except Exception as x:
         if verbosity < 2:
             print('{0}: {1}'.format(x.__class__.__name__, x), file=sys.stderr)
             sys.exit(1)
         else:
             raise
-
-def init_backend(db, user, readonly):
-    # Get the backend location and name from the config file
-    cfg = read_config_file()
-    backend_module = cfg.get('abcd', 'backend_module')
-    backend_name = cfg.get('abcd', 'backend_name')
-
-    if not backend_module or not backend_name:
-        print('  Please specify the backend in ~/.abcd_config')
-        sys.exit()
-
-    # Import the backend and other external libraries
-    Backend = getattr(__import__(backend_module, fromlist=[backend_name]), backend_name)
-    box = StructureBox(Backend(database=db, user=user, readonly=readonly))
-    token = box.authenticate(Credentials(user))
-
-    return box, token
-
-def communicate_via_ssh(host, sys_args, tty, data_out=None):
-    if tty:
-        tty_flag = '-t'
-        stdout = None
-        stderr = None
-    else:
-        tty_flag = '-T'
-        stdout=subprocess.PIPE
-        stderr=subprocess.PIPE
-
-    if data_out and not data_out.isspace():
-        ssh_call = 'echo {} | ssh -q {} {} '.format(b64encode(data_out), tty_flag, host)
-    else:
-        ssh_call = 'ssh -q {} {} '.format(tty_flag, host)
-
-    arguments = ' '.join(sys_args)
-    arguments = '\' {}\''.format(arguments)
-    command = ssh_call + arguments
-
-    process = subprocess.Popen(command, shell=True, stdout=stdout, stderr=stderr)
-    stdout, stderr = process.communicate()
-
-    return stdout, stderr, process.returncode
 
 def to_stderr(*args):
     '''Prints to stderr'''
@@ -340,7 +259,7 @@ def print_result(result, parsed, aux_files, database):
         for f in not_included:
             print('  ', f)
 
-def run(args, sys_args, verbosity, local, ssh, user, readonly):
+def run(args, sys_args, verbosity):
 
     def out(*args):
         '''Prints information in accordance to verbosity'''
@@ -351,14 +270,17 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
     query = translate(args.query)
 
     # Decide which keys to show
-    if args.keys == '++':
-        keys = '++'
-    else:
-        keys = args.keys.split(',')
+    keys = args.keys.split(',')
+    if '' in keys:
+        keys.remove('')
     
     omit_keys = args.omit_keys.split(',')
     if '' in omit_keys:
         omit_keys.remove('')
+
+    sort = args.sort.split(',')
+    if '' in sort:
+        sort.remove('')
 
     # Get kvp
     kvp = {}
@@ -374,31 +296,50 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             remove_keys.append(key)
 
 
-    if args.remove and ssh and local:
-        communicate_via_ssh(args.remote, sys_args, tty=True)
+    #
+    #
+    # Backend initialisation and authentication
+    cfg = read_config_file()
+    backend_module = cfg.get('abcd', 'backend_module')
+    backend_name = cfg.get('abcd', 'backend_name')
+
+    # Quit if no backend was specified
+    if not backend_module or not backend_name:
+        print('  Please specify the backend in ~/.abcd_config')
+        sys.exit()
+
+    # Import the backend
+    Backend = getattr(__import__(backend_module, fromlist=[backend_name]), backend_name)
+
+    # Initialise the backend
+    box = StructureBox(Backend(database=args.database, remote=args.remote))
+
+    # Get the username and password
+    if args.user == []:
+        user = raw_input('User: ')
+    else:
+        user = args.user
+
+    if args.password == []:
+        password = raw_input('Password: ')
+    else:
+        password = args.password
+
+    # Authenticate
+    token = box.authenticate(Credentials(user))
+    #
+    #
+    #
+
 
     # Remove entries from a database
-    elif args.remove:
-        box, token = init_backend(args.database, user, readonly)
+    if args.remove:
         result = box.remove(token, query, just_one=False)
         print(result.msg)
-
-    elif args.write_to_file and ssh and local:
-        stdout, stderr, ret = communicate_via_ssh(args.remote, sys_args, tty=False)
-
-        if stderr and not stderr.isspace():
-            to_stderr(stderr)
-        if ret or stdout.isspace():
-            return
-
-        s = StringIO.StringIO(stdout)
-        untar_file(s, args.path_prefix)
 
     # Extract a configuration from the database and write it
     # to the specified file.
     elif args.write_to_file:
-        box, token = init_backend(args.database, user, readonly)
-
         filename = args.write_to_file
         if '.' in filename:
             filename, display_format = filename.split('.')
@@ -411,15 +352,11 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         else:
             format = display_format
 
-        if ssh and not local:
-            tarstring = StringIO.StringIO()
-            tar = tarfile.open(fileobj=tarstring, mode='w')
-
         nrows = 0
         list_of_atoms = []
         omit = omit_keys + ['original_file_contents']
         for atoms in box.find(auth_token=token, filter=query, 
-                            sort=args.sort, reverse=args.reverse,
+                            sort=sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit):
             list_of_atoms.append(atoms)
             nrows += 1
@@ -457,59 +394,22 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         files_written = 0
         if one_file:
             name = filename + '.' + display_format
-            if ssh and not local:
-                add_atoms_to_tar(tar, list_of_atoms, name, format)
-            else:
-                write_atoms_locally(list_of_atoms, name, format, args.path_prefix)
-                files_written = 1
+            write_atoms_locally(list_of_atoms, name, format, args.path_prefix)
+            files_written = 1
         else:
             # Write extracted configurations into separate files
             for i, atoms in enumerate(list_of_atoms):
                 name = filename % i + '.' + display_format
-                if ssh and not local:
-                    add_atoms_to_tar(tar, atoms, name, format)
-                else:
-                    write_atoms_locally(atoms, name, format, args.path_prefix)
-                    files_written += 1
+                write_atoms_locally(atoms, name, format, args.path_prefix)
+                files_written += 1
 
-        if ssh and not local:
-            print(tarstring.getvalue())
-            tar.close()
-        else:
-            out('  -> Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
-
-    # Receives the tar file and untars it
-    elif args.extract_original_files and ssh and local:
-        stdout, stderr, ret = communicate_via_ssh(args.remote, sys_args, tty=False)
-
-        if stderr and not stderr.isspace():
-            to_stderr(stderr)
-        if ret or stdout.isspace():
-            return
-
-        s = StringIO.StringIO(stdout)
-        members = untar_file(s, args.path_prefix, quiet=True)
-
-        # Untar individual tarballs
-        if args.untar:
-            untar_and_delete(members, args.path_prefix)
-            msg = '  Files were untarred to {}/'.format(args.path_prefix)
-        else:
-            msg = '  Files were written to {}/'.format(args.path_prefix)
-        out(msg)
+        out('  -> Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
 
     # Extract original file(s) from the database and write them
     # to the directory specified by the --path-prefix argument 
     # (current directory by default), or print the file
     # to stdout.
     elif args.extract_original_files:
-        box, token = init_backend(args.database, user, readonly)
-
-        # If over ssh, create a tar file in memory
-        if ssh and not local:
-            c = StringIO.StringIO()
-            tar = tarfile.open(fileobj=c, mode='w')
-
         # Extract original file contents from the atoms
         names = []
         unique_ids = []
@@ -517,7 +417,7 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         skipped_configs = []
         nat = 0
         for atoms in box.find(auth_token=token, filter=query, 
-                        sort=args.sort, reverse=args.reverse,
+                        sort=sort, reverse=args.reverse,
                         limit=args.limit,
                         keys=['original_file_contents', 'uid']):
             nat += 1
@@ -540,72 +440,30 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
 
         extracted_paths = []
 
-        # Add the file to the tar file which will
-        # be printed to stdout.
-        if ssh and not local:
-            for i in range(len(names)):
-                filestring = StringIO.StringIO(b64decode(original_files[i]))
-                info = tarfile.TarInfo(name=names[i]+'.tar')
-                info.size = len(filestring.buf)
-                tar.addfile(tarinfo=info, fileobj=filestring)
-            tar.close()
-            print(c.getvalue())
+        # Write the file locally
+        for i in range(len(names)):
+            path = os.path.join(args.path_prefix, names[i]+'.tar')
 
-            msg = '  Extracted original files from {} configurations\n'.format(len(names))
-            if skipped_configs:
-                msg += '  No original files stored for configurations {}'.format(skipped_configs)
-            to_stderr(msg)
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            elif os.path.exists(path):
+                out('{} already exists. Skipping write'.format(path))
+
+            with open(path, 'w') as original_file:
+                original_file.write(b64decode(original_files[i]))
+                extracted_paths.append(path)
+
+        msg = '  Extracted original files from {} configurations\n'.format(len(extracted_paths))
+        if skipped_configs:
+            msg += '  No original files stored for configurations {}\n'.format(skipped_configs)
+
+        # Untar individual tarballs
+        if args.untar:
+            untar_and_delete(extracted_paths, args.path_prefix)
+            msg += '  Files were untarred to {}/'.format(args.path_prefix)
         else:
-            # Write the file locally
-            for i in range(len(names)):
-                path = os.path.join(args.path_prefix, names[i]+'.tar')
-
-                if not os.path.exists(os.path.dirname(path)):
-                    os.makedirs(os.path.dirname(path))
-                elif os.path.exists(path):
-                    out('{} already exists. Skipping write'.format(path))
-
-                with open(path, 'w') as original_file:
-                    original_file.write(b64decode(original_files[i]))
-                    extracted_paths.append(path)
-
-            msg = '  Extracted original files from {} configurations\n'.format(len(extracted_paths))
-            if skipped_configs:
-                msg += '  No original files stored for configurations {}\n'.format(skipped_configs)
-
-            # Untar individual tarballs
-            if args.untar:
-                untar_and_delete(extracted_paths, args.path_prefix)
-                msg += '  Files were untarred to {}/'.format(args.path_prefix)
-            else:
-                msg += '  Files were written to {}/'.format(args.path_prefix)
-            out(msg)
-
-    # Receive configurations via stdin and write it to the database
-    elif (args.store or args.update) and ssh and not local:
-        box, token = init_backend(args.database, user, readonly)
-
-        data_in = json.loads(b64decode(sys.stdin.read()))
-
-        for dct in data_in[0]:
-            dct['atoms'] = dict2atoms(dct['atoms'], plain_arrays=True)
-
-        parsed = data_in[0]
-        aux_files = data_in[1]
-
-        if not isinstance(parsed, list) or not parsed:
-            to_stderr('No atoms received')
-            return
-        
-        if args.store:
-            # Attach key-value pairs to atoms and store them
-            atoms_list = [dct['atoms'] for dct in parsed]
-            for atoms in atoms_list:
-                atoms.info.update(kvp)
-            result = box.insert(token, atoms_list)
-        else:
-            result = box.update(token, (dct['atoms'] for dct in parsed), args.upsert, args.replace)
-        print_result(result, parsed, aux_files, args.database)
+            msg += '  Files were written to {}/'.format(args.path_prefix)
+        out(msg)
 
     elif (args.store or args.update):
         if args.store:
@@ -709,57 +567,33 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
             if not tar_empty:
                 dct['atoms'].arrays['original_file_contents'] = b64encode(c.getvalue())
 
-        if ssh and local:
-            # Convert the atoms objects to dictionaries
-            data_out = [parsed, aux_files]
-            for dct in data_out[0]:
-                dct['atoms'] = atoms2dict(dct['atoms'], plain_arrays=True)
-
-            # Serialise the data and send it to remote
-            data_string = json.dumps(data_out)
-            communicate_via_ssh(args.remote, sys_args, tty=True, data_out=data_string)
+        # Write atoms to the database
+        atoms_list = [dct['atoms'] for dct in parsed]
+        if args.store:
+            # Attach key-value pairs to atoms and store them
+            for atoms in atoms_list:
+                atoms.info.update(kvp)
+            result = box.insert(token, atoms_list)
         else:
-            # Write atoms to the database
-            box, token = init_backend(args.database, user, readonly)
-            atoms_list = [dct['atoms'] for dct in parsed]
-            if args.store:
-                # Attach key-value pairs to atoms and store them
-                for atoms in atoms_list:
-                    atoms.info.update(kvp)
-                result = box.insert(token, atoms_list)
-            else:
-                result = box.update(token, atoms_list, args.upsert, args.replace)
-            print_result(result, parsed, aux_files, args.database)
+            result = box.update(token, atoms_list, args.upsert, args.replace)
+        print_result(result, parsed, aux_files, args.database)
 
     elif args.add_keys:
-        if ssh and local:
-            communicate_via_ssh(args.remote, sys_args, tty=True)
-        else:
-            box, token = init_backend(args.database, user, readonly)
-            result = box.add_keys(token, query, kvp)
-            print(result.msg)
+        result = box.add_keys(token, query, kvp)
+        print(result.msg)
 
     elif args.remove_keys:
-        if ssh and local:
-            communicate_via_ssh(args.remote, sys_args, tty=True)
-        else:
-            box, token = init_backend(args.database, user, readonly)
-            result = box.remove_keys(token, query, remove_keys)
-            print(result.msg)
-
-    elif args.count and ssh and local:
-        communicate_via_ssh(args.remote, sys_args, tty=True)
+        result = box.remove_keys(token, query, remove_keys)
+        print(result.msg)
 
     # Count selected configurations
     elif args.count:
-        box, token = init_backend(args.database, user, readonly)
-
         if args.limit == 0:
             lim = 0
         else:
             lim = args.limit + 1
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, reverse=args.reverse,
+                            sort=sort, reverse=args.reverse,
                             limit=lim, keys=keys, omit_keys=omit_keys)
         count = atoms_it.count()
         if args.limit != 0 and count > args.limit:
@@ -767,59 +601,35 @@ def run(args, sys_args, verbosity, local, ssh, user, readonly):
         else:
             count = str(count)
         print('Found:', count)
-    
-    elif args.show and ssh and local:
-        communicate_via_ssh(args.remote, sys_args, tty=True)
-
-    
-
-    elif ssh and local:
-        communicate_via_ssh(args.remote, sys_args, tty=True)
 
     elif args.ids:
-        box, token = init_backend(args.database, user, readonly)
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, reverse=args.reverse,
+                            sort=sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
             print(atoms.info['uid'])
 
     # Show the database
     elif args.show:
-        box, token = init_backend(args.database, user, readonly)
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, reverse=args.reverse,
+                            sort=sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         print_rows(atoms_it, border=args.pretty, 
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
 
-    # List all available databases
-    elif (args.list or not args.database) and ssh and local:
-        communicate_via_ssh(args.remote, sys_args, tty=True)
-        return
-
     elif args.list or not args.database:
-        box, token = init_backend(args.database, user, readonly)
-
         dbs = box.list(token)
-        if user:
-            username = user
-        else:
-            username = 'Local User'
         if dbs:
-            print(('Hello, {}. Databases you have access to:').format(username))
+            print('Hello. Databases you have access to:')
             for db in dbs:
                 print('   {}'.format(db))
         else:
-            print(('Hello, {}. You don\'t have access to any databases.').format(username))
-        return
+            print('Hello. You don\'t have access to any databases.')
 
     # Print info about keys
     else:
-        box, token = init_backend(args.database, user, readonly)
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=args.sort, reverse=args.reverse,
+                            sort=sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         print_keys_table(atoms_it, border=args.pretty, 
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
-

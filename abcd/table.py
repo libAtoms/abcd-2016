@@ -49,11 +49,11 @@ def filter_keys(keys_list, show_keys, omit_keys):
     new_keys_list = list(keys_list)
     not_displaying = set()
     for key in keys_list:
-        if key in omit_keys or (show_keys != '++' and key not in show_keys):
+        if key in omit_keys or (show_keys != [] and key not in show_keys):
             new_keys_list.remove(key)
     return new_keys_list
 
-def print_rows(atoms_list, border=True, truncate=True, show_keys='++', omit_keys=[]):
+def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
     dicts = atoms_list2dict(atoms_list)
     if not dicts:
         print '  Nothing to display'
@@ -133,7 +133,7 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys='++', omit_keys
     s += comment + '  Rows: {}'.format(no_rows)
     print s
 
-def print_keys_table(atoms_list, border=True, truncate=True, show_keys='++', omit_keys=[]):
+def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
 
     dicts = atoms_list2dict(atoms_list)
     if len(dicts) == 0:

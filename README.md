@@ -1,14 +1,55 @@
 # ABCD
-## Frontend
-Apart from ASE (min. version required 3.10.0.4590), no additional python modules or packages are needed to query remote databases. To run the script locally a backend is needed, as well as the "prettytable" and "numpy" python packages.
+**ABCD** (**A**tom-**B**ased **C**onfiguration **D**atabase) was designed to work with any backend that conforms to the specification. To use ABCD, two main steps have to be berformed:
 
-### Examples of remote querying/retrieval
+- *abcd* installation
+- backend installation
+
+## ABCD installation
+
+- Download and manually install the development version of ASE from *https://wiki.fysik.dtu.dk/ase/download.html#latest-development-release* (min. version required 3.10.0.4590)
+- Change the directory to *abcd/* and run ```python setup.py install --user``` to install the abcd package. It will install the *abcd* tool on your system.
+- Specify the backend to be used under *~/.abcd_config*. The script will try to import the module by calling ```from <backend_module> import <backend_name>```.
+
+## Backend installation
+This will vary depending on the backend. For example, these are the steps required to install the ASEdb backend:
+
+### ASEdb backend
+
+(Note: If you will want to allow access to your databases to the outside world, create a new UNIX user (say, abcd) and install both the *abcd* and the ASEdb backend on this user.)
+
+- Run the setup script (it will install two commands: *abcd-asedb* and *abcd-asedb-server*):
+
+> cd backends/asedb_sqlite3  
+> python setup.py install --user
+
+- Open *~/.abcd_config* and complete it in the following way:
+
+> [abcd]  
+> opts = ''  
+> backend\_module = asedb_sqlite3\_backend.asedb\_sqlite3_backend  
+> backend\_name = ASEdbSQlite3Backend  
+
+- Run the additional setup by executing ```abcd-asedb --setup```.
+
+All your databases are stored in the *$databases/all/* directory. If you run the script locally, you have full access to the all/ directory. To allow access to your databases from the outside (which is optional):
+
+- Execute ```abcd-asedb --add-user USER``` (replace USER with the name of a person you want to give access to). This will prompt you for a public SSH key of USER, and then add an entry in the *~/.ssh/authorized_keys* file and create a folder *$databases/USER*. If you want to give this user access to your database, you should create a symlink to a corresponding file under *$databases/all*. If the user queries your machine remotely, they will have access only to what is in their user folder.
+
+### Examples of local usage
+
+- ```abcd db1.db 'energy>0.7' --count``` - count the number of selected rows
+- ```abcd db1.db 'energy>0.8' --remove``` - remove selected configurations
+- ```abcd db1.db --store conf1.xyz conf2.xyz info.txt``` - store original files in the database
+- ```abcd db1.db --store configs/``` - store the whole directory in the database
+- ```abcd db1.db --omit-keys 'key1,key2' --show``` - omit keys key1 and key2
+
+### Examples of remote usage
 
 - ```abcd --help``` - display help
 - ```abcd --remote abcd@gc121mac1 db1.db --show```  - display the database
 - ```abcd --remote abcd@gc121mac1 db1.db``` - display information about available keys
 - ```abcd abcd@gc121mac1:db1.db 'energy<0.6 elements~C elements~H,F,Cl'``` - querying (remote can be specified using a colon before the database name)
-- ```abcd abcd@gc121mac1:db1.db --extract-original-files --path-prefix extracted_files``` - extract original files to the specified folder
+- ```abcd abcd@gc121mac1:db1.db --extract-original-files --path-prefix extracted_files --untar``` - extract original files to the specified folder
 - ```abcd abcd@gc121mac1:db1.db --write-to-file extr%03d.xyz``` - write configurations from the database to files extr001.xyz, extr002.xyz, ...
 
 **Note for the OSX users:** If you see the following warning when connecting to a remote:  
@@ -17,14 +58,6 @@ Apart from ASE (min. version required 3.10.0.4590), no additional python modules
 
 You can remove it by adding the following line to the ~/.ssh/config file on your local machine:  
 > ForwardX11 no
-
-### Examples of running locally
-
-- ```abcd db1.db 'energy>0.7' --count``` - count number of selected rows
-- ```abcd db1.db 'energy>0.8' --remove``` - remove selected configurations
-- ```abcd db1.db --store conf1.xyz conf2.xyz info.txt``` - store original files in the database
-- ```abcd db1.db --store configs/``` - store the whole directory in the database
-- ```abcd db1.db --omit-keys 'key1,key2' --show``` - omit keys key1 and key2
 
 ### Queries
 
@@ -43,27 +76,7 @@ Operator ```!=``` is an exception, because comma-separated values that follow it
 **Notes** 
 
 - If a query contains "<" or ">" it needs to be enclosed in quotes.
-- (Only for the ASEdb SQLite3 backend) If a row doesn't contain a key K, then a query ```K!=VAL``` will not show this row. This might change in future versions.
-
-### Installing
-
-No install is needed when the script is to be run only remotely. To use it locally:
-
-- Download and manually install the development version of ASE from *https://wiki.fysik.dtu.dk/ase/download.html#latest-development-release* (min. version required 3.10.0.4590)
-- Change the directory to *abcd/* and run ```python setup.py install --user``` to install the abcd package. It will install the abcd tool on your system.
-- Install the backend by running its corresponding setup script in the same way. For example, if installing the ASEdb backend: ```cd backends/asedb_sqlite3 && python setup.py install --user```
-- Open ~/.abcd_config and specify your backend. The script will try to import the module using ```from <backend_module> import <backend_name>.``` For example, if using the ASEdbSQlite3 backend, the *backend\_module* field should be ```asedb_sqlite3_backend.asedb_sqlite3_backend``` and *backend\_name* should be ```ASEdbSQlite3Backend```.
-- If using the ASEdb backend, run the additional setup by executing ```python asedb_sqlite3_backend.py --setup```.
-- The script is now ready to be used. To use it, just call ```abcd```
-
-### Allowing access to your databases from the outside
-This section assumes that you have already installed the backend (see previous section for instructions how to do it). To allow remote access, you will need a separate user on your Unix machine (say, "abcd").
-
-To allow access for the user USER, execute asedb_sqlite3_backend.py script (which is found under "abcd/backends/asedb_sqlite3/asedb_sqlite3_backend/") in the following way:  
-```python asedb_sqlite3_backend.py --add-user USER```  
-You will then be asked for the public ssh key of this USER.
-
-In case of the ASEdb backend, all your databases are stored in the $databases/all/ directory. If you run the script locally, you have full access to the all/ directory. If you want to give someone access to your files, you should create a directory with their name (which should be the same as in the *authorized_keys* file) and in it symlinks to corresponding files under $databases/all. If the user queries your machine remotely, they will have access only to files in their folder.
+- (Only for the ASEdb SQLite3 backend) If a row doesn't contain a key K, then a query ```K!=VAL``` will not show this row. This might be fixed in future versions.
 
 ## Backends
 

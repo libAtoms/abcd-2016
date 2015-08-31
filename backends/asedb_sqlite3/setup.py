@@ -16,5 +16,10 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 2.7",
         "Development Status:: 2 - Pre - Alpha"],
+    entry_points={
+        'console_scripts': [
+            'abcd-asedb-server = asedb_sqlite3_backend.server:main',
+            'abcd-asedb = asedb_sqlite3_backend.util:main'
+        ],
+    }
 )
-

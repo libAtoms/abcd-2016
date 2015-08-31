@@ -94,10 +94,10 @@ class Backend(object):
         :param AuthToken auth_token: Authorisation token
         :param filter: Filter
         :type filter: list of Conditions
-        :param string sort: Sort in increasing order
+        :param list sort: Sort in increasing order
         :param bool reverse: Reverse the sorting order
         :param int limit: limit the number of returned entries
-        :param list keys: keys to be returned. '++' for all
+        :param list keys: keys to be returned. Empty for all
         :param list keys: keys to be omitted
         :return:
         :rtype: Iterator to the Atoms object
@@ -159,14 +159,20 @@ class Cursor(object):
 
 
 class WriteError(Exception):
-    """Error which is thrown by the backend if write fails"""
+    """Error which is raised by the backend if write fails"""
     def __init__(self, message):
         self.message = message
         super(WriteError, self).__init__(message)
 
 
 class ReadError(Exception):
-    """Error which is thrown by the backend if read fails"""
+    """Error which is raised by the backend if read fails"""
     def __init__(self, message):
         self.message = message
         super(ReadError, self).__init__(message)
+
+class CommunicationError(Exception):
+    """Error which is raised by the backend if communication with remote fails"""
+    def __init__(self, message):
+        self.message = message
+        super(CommunicationError, self).__init__(message)
