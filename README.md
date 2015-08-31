@@ -33,7 +33,13 @@ This will vary depending on the backend. For example, these are the steps requir
 
 All your databases are stored in the *$databases/all/* directory. If you run the script locally, you have full access to the all/ directory. To allow access to your databases from the outside (which is optional):
 
-- Execute ```abcd-asedb --add-user USER``` (replace USER with the name of a person you want to give access to). This will prompt you for a public SSH key of USER, and then add an entry in the *~/.ssh/authorized_keys* file and create a folder *$databases/USER*. If you want to give this user access to your database, you should create a symlink to a corresponding file under *$databases/all*. If the user queries your machine remotely, they will have access only to what is in their user folder.
+- Execute ```abcd-asedb --add-user USER``` (replace USER with the name of a person you want to give access to). This will prompt you for a public SSH key of USER, and then add an entry in the *~/.ssh/authorized_keys* file and create folders *$databases/USER* and *$databases/USER_readonly*.
+
+If the user queries your machine remotely, they will have access only to what is in their user folders (*$databases/USER* and *$databases/USER_readonly*). Anything under $databases/USER_readonly* is considered to be read-only, while anything under $databases/USER* is readable and writable by the USER. 
+
+If you want to give the USER access to your database, create a symlink to this database (which is under *$databases/all*) and put this symlink either in $databases/USER* or $databases/USER_readonly*. For example:
+
+*$databases/patrick_readonly/db1.db -> *$databases/all/db1.db*  - user *patrick* has a read-only access to the database *db1.db*.
 
 ### Examples of local usage
 

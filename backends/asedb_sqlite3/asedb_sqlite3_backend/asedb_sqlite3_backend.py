@@ -84,6 +84,14 @@ class ASEdbSQlite3Backend(Backend):
                 return func(*args, **kwargs)
         return func_wrapper
 
+    def read_only(func):
+        def func_wrapper(*args, **kwargs):
+            if args[0].readonly:
+                raise WriteError('No write access')
+            else:
+                return func(*args, **kwargs)
+        return func_wrapper
+
     def __init__(self, database=None, user=None, password=None, remote=None):
         if user == 'all':
             raise RuntimeError('Invalid username: '.format('all'))
@@ -92,6 +100,7 @@ class ASEdbSQlite3Backend(Backend):
         self.connection = None
         self.root_dir = None
         self.remote = remote
+        self.readonly = True
 
         # Get the user. If the script is running locally, we have access
         # to all databases.
@@ -153,7 +162,9 @@ class ASEdbSQlite3Backend(Backend):
         if self.remote:
             dbs = communicate_with_remote(self.remote, 'list')
         else:
-            dbs = glob.glob(os.path.join(self.root_dir, '*.db'))
+            dbs_write = glob.glob(os.path.join(self.root_dir, '*.db'))
+            dbs_read = glob.glob(os.path.join(self.root_dir + '_readonly', '*.db'))
+            dbs = dbs_write + [db + ' (readonly)' for db in dbs_read]
         return [os.path.basename(db) for db in dbs]
 
     def authenticate(self, credentials):
@@ -164,12 +175,31 @@ class ASEdbSQlite3Backend(Backend):
     def connect_to_database(self):
         '''
         Connnects to a database with given name. If it doesn't
-        exist, a new one is created.
+        exist, a new one is created. The method first looks in the 
+        "write" folder, and then in the "readonly" folder
         '''
 
-        # Look inside the root_dir to see if the datbase exists
-        if not os.path.isfile(os.path.join(self.root_dir, self.database)):
-            # Database does not exist. Create a new one.
+        # Check if "readonly" and "write" directories exist
+        if not os.path.isdir(self.root_dir):
+            raise WriteError('{} does not exist. Create it.'.format(self.root_dir))
+        if self.user and not os.path.isdir(self.root_dir + '_readonly'):
+            raise WriteError('{} does not exist. Create it.'.format(self.root_dir + '_readonly'))
+
+        write_db_path = os.path.join(self.root_dir, self.database)
+        read_db_path = os.path.join(self.root_dir + '_readonly', self.database)
+
+        if os.path.exists(write_db_path):
+            write_exists = True
+        else:
+            write_exists = False
+
+        if os.path.exists(read_db_path):
+            read_exists = True
+        else:
+            read_exists = False
+
+        if not read_exists and not write_exists:
+            # No database with such name exists. Create one
             if self.user:
                 new_db_name = '_' + self.user + '_' + self.database
             else:
@@ -177,14 +207,20 @@ class ASEdbSQlite3Backend(Backend):
             new_db_path = os.path.join(self.dbs_path, 'all', new_db_name)
             self.connection = connect(new_db_path)
 
-            # Create a symlink
+             # Create a symlink
             if self.user:
                 user_db_path = os.path.join(self.root_dir, self.database)
                 os.symlink(new_db_path, user_db_path)
+            self.readonly = False
+
+        elif (read_exists and write_exists) or (write_exists):
+            # If two databsaes with the same name exist, connect to the "write" one
+            self.connection = connect(write_db_path)
+            self.readonly = False
+
         else:
-            # Database exists. Connect to it.
-            db_path = os.path.join(self.root_dir, self.database)
-            self.connection = connect(db_path)
+            self.connection = connect(read_db_path)
+            self.readonly = True
 
     def _preprocess(self, atoms):
         '''
@@ -254,6 +290,7 @@ class ASEdbSQlite3Backend(Backend):
         else:
             return False
 
+    @read_only
     @require_database
     def insert(self, auth_token, atoms_list):
 
@@ -297,6 +334,7 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
         return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
 
+    @read_only
     @require_database
     def update(self, auth_token, atoms_list, upsert, replace):
         '''Takes the Atoms object or a list of Atoms objects'''
@@ -387,6 +425,7 @@ class ASEdbSQlite3Backend(Backend):
         return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, 
                                     upserted_ids=upserted_ids, replaced_ids=replaced_ids, msg=msg)
 
+    @read_only
     @require_database
     def remove(self, auth_token, filter, just_one):
 
@@ -429,6 +468,8 @@ class ASEdbSQlite3Backend(Backend):
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(lambda x: row2atoms(x, keys, omit_keys), rows_iter))
 
+    @read_only
+    @require_database
     def add_keys(self, auth_token, filter, kvp):
 
         if self.remote:
@@ -441,6 +482,8 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))
         return results.AddKvpResult(modified_ids=[], no_of_kvp_added=n, msg=msg)
 
+    @read_only
+    @require_database
     def remove_keys(self, auth_token, filter, keys):
         
         if self.remote:

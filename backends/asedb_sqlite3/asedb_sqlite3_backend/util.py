@@ -59,6 +59,14 @@ def add_user(user):
         os.mkdir(user_dbs_path)
         print '  Created {}'.format(user_dbs_path)
 
+    # Same, but for read-only
+    readonly_dir = user_dbs_path + '_readonly'
+    if os.path.isdir(readonly_dir):
+        print '  Readonly directory for user "{}" already exists under {}'.format(user, user_dbs_path)
+    else:
+        os.mkdir(readonly_dir)
+        print '  Created {}'.format(readonly_dir)
+
 def setup():
     '''
     Create a config file and a directory in which databases will be stored.
