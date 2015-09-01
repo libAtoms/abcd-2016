@@ -19,7 +19,7 @@ from structurebox import StructureBox
 from authentication import Credentials
 from query import translate
 from results import UpdateResult, InsertResult
-from table import print_keys_table, print_rows
+from table import print_keys_table, print_rows, print_long_row
 from config import read_config_file, create_config_file, config_file_exists
 
 description = ''
@@ -76,6 +76,7 @@ def main():
     add('--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
     add('--show', action='store_true', help='Show the database')
+    add('--long', action='store_true', help='Show more informaion about one selected configuration')
     add('--pretty', action='store_true', default=True, help='Use pretty tables')
     add('--no-pretty', action='store_false', dest='pretty', help='Don\'t use pretty tables')
     add('--limit', type=int, default=0, metavar='N',
@@ -616,6 +617,24 @@ def run(args, sys_args, verbosity):
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         print_rows(atoms_it, border=args.pretty, 
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
+
+    elif args.long:
+        atoms_it = box.find(auth_token=token, filter=query, 
+                            sort=sort, reverse=args.reverse,
+                            limit=args.limit, keys=keys, omit_keys=omit_keys)
+        try:
+            atoms = next(atoms_it)
+        except StopIteration:
+            to_stderr('No matches')
+            return
+
+        try:
+            next(atoms_it)
+            to_stderr('\nWarning: more than one matches. Showing only one configuration.')
+        except StopIteration:
+            pass
+
+        print_long_row(atoms)
 
     elif args.list or not args.database:
         dbs = box.list(token)

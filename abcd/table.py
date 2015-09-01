@@ -9,6 +9,7 @@ from numpy import linalg as LA
 import numpy as np
 
 def trim(val, length):
+    '''Trim the string if it's longer than "length" (and add dots at the end)'''
     s = str(val)
     if length == -1 or (len(s) <= length+1):
         return s
@@ -16,6 +17,7 @@ def trim(val, length):
         return (s[:length] + '..')
 
 def atoms_list2dict(atoms_it):
+    '''Converts an Atoms iterator into a plain, one-level-deep list of dicts'''
     dicts = []
     for atoms in atoms_it:
         dct = atoms2dict(atoms, plain_arrays=True)
@@ -31,6 +33,7 @@ def atoms_list2dict(atoms_it):
     return dicts
 
 def format_value(value, key):
+    '''Applies special formatting for some key-value pairs'''
     v = value
     if key == 'c_time' or key == 'm_time':
         v = time.strftime('%d%b%y %H:%M', time.localtime(value))
@@ -45,7 +48,27 @@ def format_value(value, key):
         v = '<file>'
     return v
 
+def print_kvps(kvps):
+    '''Takes a list of tuples, where each tuple is a key-value pair, and
+        prints it.'''
+    try:
+        max_k = max(len(t[0]) for t in kvps)
+    except ValueError:
+        print '  -\n'
+        return
+
+    s = ''
+    for t in kvps:
+        if t[1] is None:
+            continue
+        s += '  ' + str(t[0]).ljust(max_k)
+        s += ':  '
+        s += str(format_value(t[1], t[0]))
+        s += '\n'
+    print s
+
 def filter_keys(keys_list, show_keys, omit_keys):
+    '''Decides which keys ti show given show_keys and omit_keys lists'''
     new_keys_list = list(keys_list)
     not_displaying = set()
     for key in keys_list:
@@ -54,6 +77,8 @@ def filter_keys(keys_list, show_keys, omit_keys):
     return new_keys_list
 
 def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
+    '''Prints a full table'''
+
     dicts = atoms_list2dict(atoms_list)
     if not dicts:
         print '  Nothing to display'
@@ -134,6 +159,8 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
     print s
 
 def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
+    '''Prints two tables: Intersection table and Union table, and shows min and max values 
+        for each key'''
 
     dicts = atoms_list2dict(atoms_list)
     if len(dicts) == 0:
@@ -210,3 +237,57 @@ def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_
     s += '\n' + comment + 'UNION'
     s += '\n' + comment + table_string(union)+ '\n'
     print s
+
+def print_long_row(atoms):
+    '''Prints full information about one configuration'''
+
+    d = atoms2dict(atoms, True)
+    info = d['info']
+    arrays = d['arrays']
+
+    # General information about the configuration
+    print ''
+    g = []
+    g.append(('uid', info.pop('uid', None)))
+    g.append(('c_time', info.pop('c_time', None)))
+    g.append(('m_time', info.pop('m_time', None)))
+    print_kvps(g)
+
+    # Formula and number of atoms
+    g = []
+    g.append(('formula', info.pop('formula', None)))
+    g.append(('n_atoms', info.pop('n_atoms', None)))
+    g.append(('numbers', d.pop('numbers', None)))
+    print_kvps(g)
+
+    # "Spatial" information
+    g = []
+    g.append(('config_type', info.pop('config_type', None)))
+    g.append(('cell', d.pop('cell', None)))
+    g.append(('positions', d.pop('positions', None)))
+    g.append(('pbc', d.pop('pbc', None)))
+    print_kvps(g)
+
+    # Calculated properties
+    g = []
+    g.append(('energy', d.pop('energy', None)))
+    g.append(('energy', info.pop('energy', None)))
+    g.append(('stress', d.pop('stress', None)))
+    g.append(('forces', d.pop('forces', None)))
+    g.append(('masses', d.pop('masses', None)))
+    print_kvps(g)
+
+    # Other main information
+    print 'Other:'
+    g = [(k, v) for k, v in d.iteritems() if k not in ('info', 'arrays')]
+    print_kvps(g)
+
+    # Other kvps from the info array
+    print 'Other (info):'
+    g = [(k, v) for k, v in info.iteritems()]
+    print_kvps(g)
+
+    # Data from the arrays dict
+    print 'Other (arrays):'
+    g = [(k, v) for k, v in arrays.iteritems()]
+    print_kvps(g)

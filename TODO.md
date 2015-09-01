@@ -8,8 +8,6 @@
 * Ability to add keys with commas
 * Multi-column sorting on the summary table (using a dictionary where keys are column names and values are either ASCENDING or DESCENDING).
 * Add the --unique option to the command line for the summary table
-* Add the --long option to the command line that will display more information about a single sonfiguration
-* Allow different backends to be chosen without modifying the script
 
 ## asedb-based backend
 
