@@ -461,7 +461,7 @@ class ASEdbSQlite3Backend(Backend):
             cmd += ' --keys {}'.format(keys_out)
             cmd += ' --omit-keys {}'.format(omit_keys_out)
             atoms_dcts_list = communicate_with_remote(self.remote, cmd)
-            return Cursor(iter([dict2atoms(dct, True) for dct in atoms_dcts_list]))
+            return ASEdbSQlite3Backend.Cursor(iter([dict2atoms(dct, True) for dct in atoms_dcts_list]))
 
         rows_iter = self._select(filter, sort=sort, reverse=reverse, limit=limit)
 
