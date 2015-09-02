@@ -105,12 +105,12 @@ def main():
         help='Don\'t insert configurations which are not yet in the database when using --update')
     add('--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
-    add('--untar', action='store_true', default=False,
+    add('--untar', action='store_true', default=True,
         help='Automatically untar files extracted with --extract-files')
     add('--no-untar', action='store_false', dest='untar',
         help='Don\'t automatically untar files extracted with --extract-files')
     add('--path-prefix', default='.', help='Path prefix for extracted files')
-    add('--write-to-file', metavar='(type:)filename',
+    add('--write-to-file', metavar='filename',
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('--ids', action='store_true', help='Print unique ids of selected configurations')
 
@@ -164,7 +164,7 @@ def untar_and_delete(tar_files, path_prefix):
             untar_file(f, path_prefix, quiet=True)
         os.remove(tarball)
 
-def print_result(result, parsed, aux_files, database):
+def print_result(result, multiconfig_files, database):
 
     if isinstance(result, UpdateResult):
         n_succ = len(result.updated_ids) + len(result.upserted_ids) + len(result.replaced_ids)
@@ -248,16 +248,9 @@ def print_result(result, parsed, aux_files, database):
                 print('  {}'.format(i))
 
     # Print info about what files were included
-    if n_succ:
-        if aux_files:
-            print('Original files included with each configuration:')
-            for f in aux_files:
-                print('  ', f)
-
-        not_included = set([dct['config_path'] for dct in parsed if not dct['attach_original']])
-        if not_included:
-            print('The following files were not included as original files:')
-        for f in not_included:
+    if n_succ and multiconfig_files:
+        print('The following files were not included as original files:')
+        for f in multiconfig_files:
             print('  ', f)
 
 def run(args, sys_args, verbosity):
@@ -355,7 +348,7 @@ def run(args, sys_args, verbosity):
 
         nrows = 0
         list_of_atoms = []
-        omit = omit_keys + ['original_file_contents']
+        omit = omit_keys + ['original_files']
         for atoms in box.find(auth_token=token, filter=query, 
                             sort=sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit):
@@ -404,7 +397,7 @@ def run(args, sys_args, verbosity):
                 write_atoms_locally(atoms, name, format, args.path_prefix)
                 files_written += 1
 
-        out('  -> Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
+        out('  Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
 
     # Extract original file(s) from the database and write them
     # to the directory specified by the --path-prefix argument 
@@ -420,24 +413,33 @@ def run(args, sys_args, verbosity):
         for atoms in box.find(auth_token=token, filter=query, 
                         sort=sort, reverse=args.reverse,
                         limit=args.limit,
-                        keys=['original_file_contents', 'uid']):
+                        keys=['original_files', 'uid']):
             nat += 1
-            if 'original_file_contents' not in atoms.info:
+
+            # Find the original file contents
+            contents = ''
+            if 'original_files' in atoms.info:
+                contents = atoms.info['original_files']
+            elif 'original_files' in atoms.arrays:
+                contents = atoms.arrays['original_files']
+            elif 'original_file_contents' in atoms.info:
+                contents = atoms.info['original_file_contents']
+            elif 'original_file_contents' in atoms.arrays:
+                contents = atoms.arrays['original_file_contents']
+            else:
                 skipped_configs.append(nat)
                 continue
+
             name = atoms.get_chemical_formula()
             if len(name) > 15:
                 name = str[:15]
             names.append(name)
             unique_ids.append(atoms.info['uid'])
-            original_files.append(atoms.info['original_file_contents'])
+            original_files.append(contents)
 
         # Mangle the names
-        for name in names:
-            indices = [i for i, s in enumerate(names) if s == name]
-            if len(indices) > 1:
-                for i in indices:
-                    names[i] += '-' + str(unique_ids[i])[-15:]
+        for i, name in enumerate(names):
+            names[i] += '-' + str(unique_ids[i])[-15:]
 
         extracted_paths = []
 
@@ -459,125 +461,150 @@ def run(args, sys_args, verbosity):
             msg += '  No original files stored for configurations {}\n'.format(skipped_configs)
 
         # Untar individual tarballs
-        if args.untar:
-            untar_and_delete(extracted_paths, args.path_prefix)
-            msg += '  Files were untarred to {}/'.format(args.path_prefix)
-        else:
-            msg += '  Files were written to {}/'.format(args.path_prefix)
+        if extracted_paths:
+            if args.untar:
+                untar_and_delete(extracted_paths, args.path_prefix)
+                msg += '  Files were untarred to {}/'.format(args.path_prefix)
+            else:
+                msg += '  Files were written to {}/'.format(args.path_prefix)
         out(msg)
 
     elif (args.store or args.update):
         if args.store:
-            files_args = args.store
+            to_store = args.store
         else:
-            files_args = args.update
-        
-        # Detect if the supplied arguments are directories or files
+            to_store = args.update
+
+        def parse(f):
+            try:
+                return ase_read(f, index=slice(0, None, 1))
+            except:
+                return None
+
+        atoms_to_store = []
+        multiconfig_files = []
+
+        # Clasify each argument as either file or directory
+        auxilary_files = []
+        parsable_files = []
         dirs = []
-        files = []
-        for f in files_args:
-            if os.path.isdir(f):
-                dirs.append(f)
-            elif os.path.isfile(f):
-                files.append(f)
-            else:
-                raise Exception('{} does not exist'.format(f))
-        dirs = list(set(dirs))
-        files = list(set(files))
-
-        if dirs and files:
-            raise Exception('Supplied arguments have to be either all directories or all files')
-        if len(dirs) > 1:
-            raise Exception('Storing multiple directories at the same time not yet supported')
-
-        def add_atoms_to_list(config_path, directory, atoms, lst):
-            if len(atoms) > 1:
-                for at in atoms:
-                    lst.append({'config_path':config_path, 'directory':directory, 'atoms':at, 'attach_original':False})
-            else:
-                lst.append({'config_path':config_path, 'directory':directory, 'atoms':atoms[0], 'attach_original':True})
-
-        def process_dir():
-            direct = dirs[0]
-            parsed = []
-            aux_files = []
-            for root, subFolders, files in os.walk(direct):
-                for f in files:
-                    path = os.path.join(root, f)
-                    try:
-                        atoms = ase_read(path, index=slice(0, None, 1))
-                        add_atoms_to_list(path, direct, atoms, parsed)
-                    except:
-                        aux_files.append(path)
-            return parsed, aux_files
-
-        def process_files():
-            parsed = []
-            aux_files = []
-            for f in files:
-                try:
-                    atoms = ase_read(f, index=slice(0, None, 1))
-                    add_atoms_to_list(f, None, atoms, parsed)
-                except:
-                    aux_files.append(f)
-            return parsed, aux_files
-
-        if dirs:
-            parsed, aux_files = process_dir()
-        else:
-            parsed, aux_files = process_files()
-
-        if not parsed:
-            raise Exception('Could not find any parsable files')
-
-        # Tar files together and attach the .tar to the
-        # corresponding Atoms object.
-        for dct in parsed:
-            path = dct['config_path']
-            directory = dct['directory']
-            attach = dct['attach_original']
-
-            exclude = set([d['config_path'] for d in parsed])
-            if attach:
-                exclude.remove(path)
-
-            def exclude_fn(name):
-                if name in exclude:
-                    return True
+        for f in to_store:
+            if os.path.isfile(f):
+                atoms = parse(f)
+                if atoms is not None:
+                    parsable_files.append({'atoms': atoms, 'path': f})
                 else:
-                    return False
+                    auxilary_files.append({'path': f, 'name': os.path.basename(f)})
+            elif os.path.isdir(f):
+                dirs.append(f)
+            else:
+                raise IOError('No such file or directory: "{}"'.format(f))
 
+        def create_tarball(aux_files, atoms, atoms_fname, short_fnames=False):
+            '''If short_fnames is True, only last portion of the filename is used.
+                Returns b64encoded tarball (or an empty string)'''
             c = StringIO.StringIO()
             tar = tarfile.open(fileobj=c, mode='w')
 
-            tar_empty = False
-            if directory:
-                # Tar the directory
-                arcname = os.path.basename(os.path.normpath(directory))
-                tar.add(name=directory, arcname=arcname, exclude=exclude_fn)
-                tar.close()
+            # Add auxilary files
+            for aux_f in aux_files:
+                arcname = aux_f['name']
+                tar.add(name=aux_f['path'], arcname=arcname)
+
+            # Add the file containing the original configuration,
+            # but only if it isn't a multi-config file.
+            arcname = os.path.basename(atoms_fname) if short_fnames else atoms_fname
+            if len(atoms) == 1:
+                tar.add(name=atoms_fname, arcname=arcname)
             else:
-                # Tar all the files together
+                multiconfig_files.append(arcname)
+
+            ret = ''
+            if tar.getmembers():
+                ret = b64encode(c.getvalue())
+
+            tar.close()
+            return ret
+
+        def walk(tree, atoms_to_store, aux=[]):
+            for parsed_dct in tree['parsable']:
+                atoms = parsed_dct['atoms']
+                atoms_fname = parsed_dct['path']
+                aux_files = aux + tree['auxilary']
+
+                tar = create_tarball(aux_files, atoms, atoms_fname)
+
+                # Attach the tar to the Atoms objects and add the Atoms objects to
+                # atoms_to_store.
+                for ats in atoms:
+                    if tar:
+                        ats.info['original_files'] = tar
+                    atoms_to_store.append(ats)
+
+            for subdir_name, subdir in tree['subdirs'].iteritems():
+                walk(subdir, atoms_to_store, aux + tree['auxilary'])
+
+        # Files were specified on the command line
+        if parsable_files:
+            # Iterate over parsed files
+            for parsed_dct in parsable_files:
+                atoms = parsed_dct['atoms']
+                atoms_fname = parsed_dct['path']
+
+                tar = create_tarball(auxilary_files, atoms, atoms_fname, short_fnames=True)
+
+                for ats in atoms:
+                    if tar:
+                        ats.info['original_files'] = tar
+                    atoms_to_store.append(ats)
+
+        # At least one directory was specified on the command line.
+        for d in dirs:
+            # Convert directories to a tree
+
+            d = d.rstrip(os.sep)
+            parent_dir, dirname = os.path.split(d)
+
+            # Change the directory to parent_dir so that all the names are relative to it
+            if parent_dir:
+                os.chdir(parent_dir)
+
+            # If any additional auxilary files were specified, treat them as being in
+            # the directory "dirname".
+            additional_aux = [{'path': dct['path'], 'name': os.path.join(dirname, dct['name'])} for dct in auxilary_files]
+            tree = {dirname: {'subdirs': {}, 'parsable': [], 'auxilary': additional_aux}}
+
+            for root, dirs, files in os.walk(dirname):
+                folders = list(root.split(os.sep))
+                if '' in folders:
+                    folders.remove('')
+
+                current = tree
+                for i, folder in enumerate(folders):
+                    if i == 0:
+                        current = current[folder]
+                    else:
+                        current = current['subdirs'][folder]
+                for subdir in dirs:
+                    current['subdirs'][subdir] = {'subdirs': {}, 'parsable': [], 'auxilary': []}
+
                 for f in files:
-                    tar.add(name=f, arcname=os.path.basename(f), exclude=exclude_fn)
-                if not tar.getmembers():
-                    tar_empty = True
-                tar.close()
+                    fname = os.path.join(root, f)
+                    atoms = parse(fname)
+                    if atoms is None:
+                        current['auxilary'].append({'path': fname, 'name': fname})
+                    else:
+                        current['parsable'].append({'atoms': atoms, 'path': fname})
 
-            # Attach original file to the Atoms object
-            if not tar_empty:
-                dct['atoms'].arrays['original_file_contents'] = b64encode(c.getvalue())
+            # Now walk the tree to find all parsed files
+            walk(tree[dirname], atoms_to_store)
 
-        # Write atoms to the database
-        atoms_list = [dct['atoms'] for dct in parsed]
+        # Store/update parsed atoms
         if args.store:
-            # Attach key-value pairs to atoms and store them
-            for atoms in atoms_list:
-                atoms.info.update(kvp)
-            result = box.insert(token, atoms_list)
+            result = box.insert(token, atoms_to_store)
         else:
-            result = box.update(token, atoms_list, args.upsert, args.replace)
-        print_result(result, parsed, aux_files, args.database)
+            result = box.update(token, atoms_to_store, args.upsert, args.replace)
+        print_result(result, multiconfig_files, args.database)
 
     elif args.add_keys:
         result = box.add_keys(token, query, kvp)

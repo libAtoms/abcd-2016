@@ -44,7 +44,7 @@ def format_value(value, key):
                 v += 'T' if a else 'F'
         else:
             v += 'T' if value else 'F'
-    elif key == 'original_file_contents':
+    elif key == 'original_files':
         v = '<file>'
     return v
 

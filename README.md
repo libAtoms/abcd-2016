@@ -84,6 +84,68 @@ Operator ```!=``` is an exception, because comma-separated values that follow it
 - If a query contains "<" or ">" it needs to be enclosed in quotes.
 - (Only for the ASEdb SQLite3 backend) If a row doesn't contain a key K, then a query ```K!=VAL``` will not show this row. This might be fixed in future versions.
 
+### Storing ###
+
+Use ```--store [DIR/file] [DIR/file] ...``` to store configurations. This will find all parsable files specified, parse them with ASE and insert them into a specified database. To each configuration it also attaches "original files" - a file from which the configuration came from and other, non-parsable "auxilary files". Note the following terminology:
+
+- configuration file - ASE-parsable file that contains a configuration
+- multi-coniguration file - a configuration file which contains more than one configuration
+- auxilary file - non-parsable file which is related to a configuration file that will be stored
+
+Depending on whether directories or files are specified, *--store* can have slightly different behaviour:
+
+- ```--store DIR1``` - store all parsable files under *DIR1*, and to each configuration attach auxiliary files that are on the direct ancestral path to the configuration, and auxiliary files which are in the same directory as the configuration. The files are tarred together and the directory structure is preserved.
+
+- ```--store DIR1 DIR2 ...``` - equivalent to calling *--store* on each directory separately.
+
+- ```--store config1 config2 ... aux1 aux2 ...``` - store files that contain a configuration, and to each attach all auxiliary files. In this case directory structure is not preserved. For example, the first inserted row will contain files *config1, aux1, aux2, ...*; while the second will contain *config2, aux1, aux2, ...*
+
+- ```--store DIR aux1 aux2 ...``` - This stores a directory (or many of them), and attaches additional auxiliary files specified on the command line (treating them as if they were directly inside *DIR/*).
+
+- ```--store DIR1 DIR2 ... conf1 conf2 ... aux1 aux2 ...``` - When parsable files, directories and auxiliary files are mixed together, it is equivalent to calling the following two commands separately:
+
+ ```abcd db1 --store conf1 conf2 ... aux1 aux2```
+ ```abcd db1 --store DIR1 DIR2 ... aux1 aux2 ...```
+
+**Note:** Multi-configuration files are **not** stored as original files (only single-confiuration files are).
+
+### Updating ###
+
+Use ```--update [DIR/file] [DIR/file] ...``` to update configurations. It interprets the given arguments in exactly the same way as the *--update* option (see above). However, updating has a different behaviour from storing. After *--update* parses all given configurations, it checks whether these configurations already exist in the database. This check is done using the *uid* key, which is automatically added to the configuration when inserting it into the database. If the corresponding configuration in the database is found, it has its keys updated using the following rules:
+
+- keys which are present in the new configuration, but not in the old one, are added
+- keys which are present in the old configuration, but not in the new one, are left unchanged
+- keys present in both configurations have their values set to the values from the new configuration
+
+If the corresponding configuration is not found in the database, it is skipped (nothing is added or modified). However, the behaviour of *--update* can be modified using two flags, which can be either set to True or False:
+
+- ```--upsert``` - If True, configurations which are not yet in the database are inserted. If False, the insert is skipped. The default is False.
+
+- ```--replace``` - If True, it replaces the existing configuration with the a one (instead of updating it). If False, it is updated. The default is False.
+
+### Extracting configurations ##
+
+There are two ways of extracting configurations from the databse, but they both do different things:
+
+#### --write-to-file ####
+
+```--write-to-file FILE``` Uses the ASE *write()* function to write configurations into files. It accepts a file name as an argument. The file format is deduced from the extension (note: specifying .xyz will use the .extxyz format). If no formatting string is used, all selected configurations are written into a single, multi-configuration file:
+
+```--write-to-file extracted.xyz```  # Produces a single file "extracted.xyz"
+
+However, if a formatting string is used, *abcd* writes each configuration into a separate file:
+
+```--write-to-file extracted_%03d.xyz```  # Produces files extracted\_001.xyz, extracted\_002.xyz, ...
+
+
+#### --extract-original-files ####
+
+*--extract-original-files* extracts original files which were attached to the configuration when calling --store. It extracts auxilary files (if any were added), and configuration files (only if the "source" file was a single-configuration file). The following options can also be used:
+
+- ```--path-prefix PATH``` - extract files to a different directory. The default is the current working directory.
+
+- ```--no-untar``` - don't untar files when extracting. This produces a tarball with all original files. Useful when name conflicts are expected.
+
 ## Backends
 
 All backends need to conform to the Backend class defined in abcd/backend.py. 
