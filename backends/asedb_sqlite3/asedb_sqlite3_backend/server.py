@@ -1,6 +1,11 @@
-__author__ = 'Patrick Szmucer'
+"""
+Interface for the ASEdb backend. Its purpose is to be triggered
+by the communicate_with_remote function from remote.py, 
+communicate with the ASEdb backend and print results/data
+to standard output. The output is b64-encoded and should be in 
+a form XYZ:OUTPUT, where XYZ is the response code which indicates
+what type of output was produced (see below).
 
-'''
 Response codes:
 201: b64encoded string
 202: json and b64encoded list
@@ -11,7 +16,9 @@ Response codes:
 222: json and b64encoded RemoveResult dictionary
 223: json and b64encoded AddKvpResult dictionary
 224: json and b64encoded RemoveKeysResult dictionary
-'''
+"""
+
+__author__ = 'Patrick Szmucer'
 
 import argparse
 import asedb_sqlite3_backend as backend

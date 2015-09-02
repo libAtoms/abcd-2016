@@ -10,6 +10,11 @@ AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
 
 
 def get_dbs_path():
+    """
+    Reads the config file and returns the path to the folder where
+    all the databases are stored.
+    """
+
     dbs_path = None
     parser = SafeConfigParser()
 
@@ -28,6 +33,11 @@ def get_dbs_path():
 
 
 def add_user(user):
+    """
+    Adds a user and their public key to ~/.ssh/authorized_keys file and creates
+    directories $databases/USER and $databases/USER_readonly.
+    """
+
     if user in reserved_usernames:
         print 'Error: username "{}" is reserved'.format(user)
         return
@@ -72,9 +82,9 @@ def add_user(user):
 
 
 def setup():
-    '''
+    """
     Create a config file and a directory in which databases will be stored.
-    '''
+    """
 
     # Check if the config file exists. If it doesn't, create it
     if not os.path.isfile(CONFIG_PATH):

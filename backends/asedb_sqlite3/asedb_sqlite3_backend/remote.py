@@ -1,3 +1,7 @@
+"""
+Functions that are used to communicate with a remote server (server.py).
+"""
+
 __author__ = 'Patrick Szmucer'
 
 import abcd.results as results
@@ -12,9 +16,9 @@ response_codes = ['200', '201', '202', '203', '204', '220', '221', '222', '223',
 
 
 def result_from_dct(result_type, **kwargs):
-    '''
+    """
     Re-creates a result that was converted to a dictionary.
-    '''
+    """
     if result_type == 'InsertResult':
         return results.InsertResult(kwargs['_inserted_ids'],
                                      kwargs['_skipped_ids'],
@@ -41,9 +45,9 @@ def result_from_dct(result_type, **kwargs):
 
 
 def communicate_with_remote(host, command):
-    '''
+    """
     Sends a command to the remote host and interprets and returns the response.
-    '''
+    """
 
     # Send command via the ssh to the remote host
     tty_flag = '-T'

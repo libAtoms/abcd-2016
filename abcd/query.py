@@ -39,7 +39,7 @@ def elements2numbers(elements):
 
 
 def interpret(query):
-	'''Translates a single query to the MongoDB format'''
+	"""Translates a single query to the MongoDB format"""
 
 	# Find the operator
 	operator = None
@@ -101,7 +101,7 @@ def interpret(query):
 
 
 def update(d1, d2):
-	'''Update dictionary d1 with d2'''
+	"""Update dictionary d1 with d2"""
 	for k, v in d2.iteritems():
 		if k in d1:
 			for op in d2[k].keys():
@@ -114,7 +114,7 @@ def update(d1, d2):
 
 
 def translate(queries_lst):
-	'''Translates a list of queries to the MongoDB format'''
+	"""Translates a list of queries to the MongoDB format"""
 
 	# Pre-process the queries. Take care to not split key values
 	# with spaces in them.

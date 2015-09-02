@@ -1,4 +1,4 @@
-__author__ = 'Martin Uhrin'
+__author__ = 'Martin Uhrin, Patrick Szmucer'
 
 import numpy as np
 from ase.atoms import Atoms
@@ -7,6 +7,10 @@ from ase.calculators.singlepoint import SinglePointCalculator
 
 
 def get_info_and_arrays(atoms, plain_arrays):
+    """
+    Extracts the info and arrays dictionaries from the Atoms object.
+    If plain_arrays is True, numpy arrays are converted to lists.
+    """
     info = {}
     arrays = {}
     for (key, value) in atoms.info.items():
@@ -34,7 +38,11 @@ def get_info_and_arrays(atoms, plain_arrays):
     return info, arrays
 
 
-def atoms2dict(atoms, plain_arrays):
+def atoms2dict(atoms, plain_arrays=False):
+    """
+    Converts the Atoms object to a dictionary. If plain_arrays is True,
+    numpy arrays are converted to lists.
+    """
     d = {
         'numbers': atoms.numbers,
         'pbc': atoms.pbc,
@@ -69,7 +77,10 @@ def atoms2dict(atoms, plain_arrays):
     return d
 
 
-def dict2atoms(d, plain_arrays):
+def dict2atoms(d, plain_arrays=False):
+    """
+    Converts a dictionary created with atoms2dict back to atoms.
+    """
     atoms = Atoms(d['numbers'],
                   d['positions'],
                   cell=d['cell'],

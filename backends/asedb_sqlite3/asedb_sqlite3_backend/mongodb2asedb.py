@@ -5,8 +5,10 @@ from itertools import product
 
 
 def interpret(key, op, val):
-    # Returns a list of ASEdb queries, where elements in this list
-    # are assumed to be ORed.
+    """
+    Returns a list of ASEdb queries, where elements in this list
+    are assumed to be ORed.
+    """
     queries = []
     if op == '$eq':
         queries.append('{}={}'.format(key, val))
@@ -42,7 +44,7 @@ def interpret(key, op, val):
 
 
 def translate_query(query):
-    '''Translates the MongoDB query to the ASEdb query'''
+    """Translates the MongoDB query to the ASEdb query"""
 
     asedb_queries = []
     for single_query in query['$and']:
