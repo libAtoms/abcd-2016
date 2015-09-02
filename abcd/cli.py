@@ -121,6 +121,7 @@ def main():
         args.database = database
 
     # Calculate the verbosity
+    # Verbosity can be either 0, 1 or 2
     verbosity = 1 - args.quiet + args.verbose
 
     try:
@@ -139,13 +140,11 @@ def to_stderr(*args):
         print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
 
 
-def untar_file(fileobj, path_prefix, quiet=False):
+def untar_file(fileobj, path_prefix):
     try:
         tar = tarfile.open(fileobj=fileobj, mode='r')
         members = tar.getmembers()
         no_files = len(members)
-        if not quiet:
-            print('  -> Writing {} file(s) to {}/'.format(no_files, path_prefix))
         tar.extractall(path=path_prefix)
         return [os.path.join(path_prefix, m.name) for m in members]
     except Exception as e:
@@ -159,7 +158,7 @@ def untar_and_delete(tar_files, path_prefix):
     # Untar individual tarballs
     for tarball in tar_files:
         with open(tarball, 'r') as f:
-            untar_file(f, path_prefix, quiet=True)
+            untar_file(f, path_prefix)
         os.remove(tarball)
 
 
