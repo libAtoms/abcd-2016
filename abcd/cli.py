@@ -51,7 +51,7 @@ def main():
             new_args.append(opt)
     sys_args = new_args + sys_args
 
-    parser = argparse.ArgumentParser(usage = 'Usage: abcd [db-name] [selection] [options]',
+    parser = argparse.ArgumentParser(usage = 'abcd [db-name] [selection] [options]',
                         description = description,
                         epilog = 'Examples: ' + examples,
                         formatter_class=argparse.RawTextHelpFormatter)
@@ -63,8 +63,8 @@ def main():
     add = parser.add_argument
     add('database', nargs='?', help = 'Specify the database')
     add('query', nargs = '*', default = '', help = 'Query')
-    add('-U', '--user', nargs='?', metavar='USER', default=None, const=[], help='User')
-    add('-P', '--password', nargs='?', metavar='PASSWD', default=None, const=[], help='Password')
+    add('-U', '--user', nargs='?', metavar='USER', default=None, const=[], help='User. Leave blank to input via stdin')
+    add('-P', '--password', nargs='?', metavar='PASSWD', default=None, const=[], help='Password. Leave blank to input via stdin')
     add('-v', '--verbose', action='store_true', default=False)
     add('-q', '--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
