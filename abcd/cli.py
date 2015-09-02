@@ -24,12 +24,12 @@ examples = '''
     abcd --remote abcd@gc121mac1 db1.db   (display information about available keys)
     abcd abcd@gc121mac1:db1.db \'energy<0.6 id>4 id<20 id!=10,11,12 elements~C elements~H,F,Cl\'   (querying; remote can be specified using a colon before the database name)
     abcd abcd@gc121mac1:db1.db --extract-original-files --path-prefix extracted/   (extract original files to the extracted/ folder)
-    abcd abcd@gc121mac1:db1.db 1 --write-to-file extr.xyz   (write the first row to the file extr.xyz)
+    abcd abcd@gc121mac1:db1.db --write-to-file extr.xyz   (write selected configurations to the file extr.xyz)
     abcd db1.db \'energy>0.7\' --count   (count number of selected rows)
     abcd db1.db \'energy>0.8\' --remove   (remove selected configurations)
     abcd db1.db --store conf1.xyz conf2.xyz info.txt   (store original files in the database)
     abcd db1.db --store configs/   (store the whole directory in the database)
-    abcd db1.db --omit-keys 'user,id' --show  (omit keys)
+    abcd db1.db --omit-keys 'user,id' --show  (show the database, but omit keys user and id)
 '''
 
 def main():
@@ -63,33 +63,33 @@ def main():
     add = parser.add_argument
     add('database', nargs='?', help = 'Specify the database')
     add('query', nargs = '*', default = '', help = 'Query')
-    add('--user', nargs='*', default=None, help='User')
-    add('--password', nargs='*', default=None, help='Password')
-    add('--verbose', action='store_true', default=False)
-    add('--quiet', action='store_true', default=False)
+    add('-U', '--user', nargs='?', metavar='USER', default=None, const=[], help='User')
+    add('-P', '--password', nargs='?', metavar='PASSWD', default=None, const=[], help='Password')
+    add('-v', '--verbose', action='store_true', default=False)
+    add('-q', '--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
-    add('--list', action = 'store_true', 
+    add('-l', '--list', action = 'store_true', 
         help = 'Lists all the databases you have access to')
-    add('--show', action='store_true', help='Show the database')
-    add('--long', action='store_true', help='Show more informaion about one selected configuration')
+    add('-o', '--show', action='store_true', help='Show the database')
+    add('-g', '--long', action='store_true', help='Show more informaion about one selected configuration')
     add('--pretty', action='store_true', default=True, help='Use pretty tables')
     add('--no-pretty', action='store_false', dest='pretty', help='Don\'t use pretty tables')
-    add('--limit', type=int, default=0, metavar='N',
+    add('-m', '--limit', type=int, default=0, metavar='N',
         help='Show only first N rows (default is 500 rows).  Use --limit=0 '
         'to show all.')
-    add('--sort', metavar='COL', default='',
+    add('-z', '--sort', metavar='COL', default='',
         help='Specify the column to sort the rows by. Default is increasing order \n(change it using --reverse)')
-    add('--reverse', action='store_true', default=False, help='Reverses the sorting order')
-    add('--count', action='store_true',
+    add('-i', '--reverse', action='store_true', default=False, help='Reverses the sorting order')
+    add('-c', '--count', action='store_true',
         help='Count number of selected rows.')
-    add('--keys', default='', help='Select only specified keys')
-    add('--omit-keys', default='', help='Don\'t select these keys')
-    add('--add-keys', metavar='{K1=V1,...}', help='Add key-value pairs')
+    add('-k', '--show-keys', metavar='K1,K2,...', default='', help='Select only specified keys')
+    add('-n', '--omit-keys', metavar='K1,K2,...', default='', help='Don\'t select these keys')
+    add('-t', '--add-keys', metavar='K1=V1,...', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     add('--remove', action='store_true',
         help='Remove selected rows.')
-    add('--store', metavar='', nargs='+', help='Store a directory / list of files')
-    add('--update', metavar='', nargs='+', help='Update the databse with a directory / list of files')
+    add('-s', '--store', metavar='', nargs='+', help='Store a directory / list of files')
+    add('-u', '--update', metavar='', nargs='+', help='Update the databse with a directory / list of files')
     add('--replace', action='store_true', default=False, 
         help='Replace configurations with the same uid when using --update')
     add('--no-replace', action='store_false', dest='replace', 
@@ -98,14 +98,14 @@ def main():
         help='Insert configurations which are not yet in the database when using --update')
     add('--no-upsert', action='store_false', dest='upsert', 
         help='Don\'t insert configurations which are not yet in the database when using --update')
-    add('--extract-original-files', action='store_true',
+    add('-x', '--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
     add('--untar', action='store_true', default=True,
         help='Automatically untar files extracted with --extract-files')
     add('--no-untar', action='store_false', dest='untar',
         help='Don\'t automatically untar files extracted with --extract-files')
-    add('--path-prefix', default='.', help='Path prefix for extracted files')
-    add('--write-to-file', metavar='filename',
+    add('-p', '--path-prefix', metavar='PREFIX', default='.', help='Path prefix for extracted files')
+    add('-w', '--write-to-file', metavar='FILE',
         help='Write selected rows to file(s). Include format string for multiple \nfiles, e.g. file_%%03d.xyz')
     add('--ids', action='store_true', help='Print unique ids of selected configurations')
 
@@ -167,7 +167,7 @@ def print_result(result, multiconfig_files, database):
     if isinstance(result, UpdateResult):
         n_succ = len(result.updated_ids) + len(result.upserted_ids) + len(result.replaced_ids)
 
-        # Print "10 configuraions were updated:"
+        # Print "10 configurations were updated:"
         n_upd = len(result.updated_ids)
         if n_upd:
             s1 = 's' if n_upd != 1 else ''
@@ -220,7 +220,7 @@ def print_result(result, multiconfig_files, database):
     if isinstance(result, InsertResult):
         n_succ = len(result.inserted_ids)
 
-        # Print "10 configuraions were inserted:"
+        # Print "10 configurations were inserted:"
         n_ins = len(result.inserted_ids)
         s1 = 's' if n_ins != 1 else ''
         s2 = 'were' if n_ins != 1 else 'was'
@@ -263,7 +263,7 @@ def run(args, sys_args, verbosity):
     query = translate(args.query)
 
     # Decide which keys to show
-    keys = args.keys.split(',')
+    keys = args.show_keys.split(',')
     if '' in keys:
         keys.remove('')
     

@@ -47,7 +47,7 @@ If you want to give the USER access to your database, create a symlink to this d
 - ```abcd db1.db 'energy>0.8' --remove``` - remove selected configurations
 - ```abcd db1.db --store conf1.xyz conf2.xyz info.txt``` - store original files in the database
 - ```abcd db1.db --store configs/``` - store the whole directory in the database
-- ```abcd db1.db --omit-keys 'key1,key2' --show``` - omit keys key1 and key2
+- ```abcd db1.db --omit-keys 'key1,key2' --show``` - show the database, but omit keys key1 and key2
 
 ### Examples of remote usage
 
