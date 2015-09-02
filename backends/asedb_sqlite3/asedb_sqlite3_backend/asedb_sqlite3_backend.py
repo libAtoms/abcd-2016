@@ -1,29 +1,29 @@
-from abcd.backend import Backend, ReadError, WriteError
+__author__ = 'Patrick Szmucer'
+
+import glob
+import json
+import numpy as np
+import os
+import re
+import time
 import abcd.backend
 import abcd.results as results
-from abcd.util import get_info_and_arrays, atoms2dict, dict2atoms
 from abcd.authentication import AuthenticationError
+from abcd.backend import Backend, ReadError, WriteError
 from abcd.query import QueryError, translate
-
-from ase.db import connect
-from ase.utils import plural
+from abcd.util import get_info_and_arrays, atoms2dict, dict2atoms
 from ase.atoms import Atoms
 from ase.calculators.calculator import all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
-
-from mongodb2asedb import translate_query
-from util import get_dbs_path, reserved_usernames
-from remote import communicate_with_remote
-
-import os
-import re
-from itertools import imap
-from random import randint
-import glob
-import time
-import numpy as np
-import json
+from ase.db import connect
+from ase.utils import plural
 from base64 import b64encode
+from itertools import imap
+from mongodb2asedb import translate_query
+from random import randint
+from remote import communicate_with_remote
+from util import get_dbs_path, reserved_usernames
+
 
 def row2atoms(row, keys, omit_keys):
     atoms = row.toatoms()
@@ -58,6 +58,7 @@ def row2atoms(row, keys, omit_keys):
         atoms.info.pop(key, None)
 
     return atoms
+
 
 class ASEdbSQlite3Backend(Backend):
 

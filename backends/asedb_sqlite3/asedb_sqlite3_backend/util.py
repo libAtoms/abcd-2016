@@ -1,11 +1,13 @@
+__author__ = 'Patrick Szmucer'
+
 import os
 import re
 from ConfigParser import SafeConfigParser
 
 reserved_usernames = ['public', 'all', 'local']
-
 CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_asedb_config')
 AUTHORIZED_KEYS = os.path.join(os.environ['HOME'], '.ssh/authorized_keys')
+
 
 def get_dbs_path():
     dbs_path = None
@@ -23,6 +25,7 @@ def get_dbs_path():
     else:
         raise RuntimeError('Config file does not exist. Run "{}" first'.format(cmd))
     return dbs_path
+
 
 def add_user(user):
     if user in reserved_usernames:
@@ -67,6 +70,7 @@ def add_user(user):
         os.mkdir(readonly_dir)
         print '  Created {}'.format(readonly_dir)
 
+
 def setup():
     '''
     Create a config file and a directory in which databases will be stored.
@@ -108,8 +112,10 @@ def setup():
         print '  Your databases directory already exists at {}'.format(dbs_path)
         print '  Your databases are stored at {}'.format(all_path)
 
+
 def print_usage():
     print 'Usage: abcd-asedb --setup / --add-user USER'
+
 
 def main():
     import sys

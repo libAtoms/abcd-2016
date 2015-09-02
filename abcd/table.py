@@ -1,12 +1,11 @@
 __author__ = 'Patrick Szmucer'
 
-from util import atoms2dict
-from ase.utils import hill
-from prettytable import PrettyTable
-import time
 import collections
-from numpy import linalg as LA
 import numpy as np
+import time
+from prettytable import PrettyTable
+from util import atoms2dict
+
 
 def trim(val, length):
     '''Trim the string if it's longer than "length" (and add dots at the end)'''
@@ -15,6 +14,7 @@ def trim(val, length):
         return s
     else:
         return (s[:length] + '..')
+
 
 def atoms_list2dict(atoms_it):
     '''Converts an Atoms iterator into a plain, one-level-deep list of dicts'''
@@ -32,6 +32,7 @@ def atoms_list2dict(atoms_it):
         dicts.append(dct)
     return dicts
 
+
 def format_value(value, key):
     '''Applies special formatting for some key-value pairs'''
     v = value
@@ -47,6 +48,7 @@ def format_value(value, key):
     elif key == 'original_files':
         v = '<file>'
     return v
+
 
 def print_kvps(kvps):
     '''Takes a list of tuples, where each tuple is a key-value pair, and
@@ -67,6 +69,7 @@ def print_kvps(kvps):
         s += '\n'
     print s
 
+
 def filter_keys(keys_list, show_keys, omit_keys):
     '''Decides which keys ti show given show_keys and omit_keys lists'''
     new_keys_list = list(keys_list)
@@ -75,6 +78,7 @@ def filter_keys(keys_list, show_keys, omit_keys):
         if key in omit_keys or (show_keys != [] and key not in show_keys):
             new_keys_list.remove(key)
     return new_keys_list
+
 
 def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
     '''Prints a full table'''
@@ -158,6 +162,7 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
     s += comment + '  Rows: {}'.format(no_rows)
     print s
 
+
 def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
     '''Prints two tables: Intersection table and Union table, and shows min and max values 
         for each key'''
@@ -237,6 +242,7 @@ def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_
     s += '\n' + comment + 'UNION'
     s += '\n' + comment + table_string(union)+ '\n'
     print s
+
 
 def print_long_row(atoms):
     '''Prints full information about one configuration'''

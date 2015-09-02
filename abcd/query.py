@@ -6,9 +6,11 @@ from ase.data import chemical_symbols
 # This is a list of operators that can be used on the command line
 operators = ['=', '!=', '>', '>=', '<', '<=', '~']
 
+
 class QueryError(Exception):
 	def __init__(self, message):
 		super(QueryError, self).__init__(message)
+
 
 def is_float(n):
 	try:
@@ -27,12 +29,14 @@ def is_int(n):
 	else:
 		return a == b
 
+
 def elements2numbers(elements):
 	for i, v in enumerate(elements):
 		try:
 			elements[i] = chemical_symbols.index(elements[i])
 		except ValueError:
 			raise QueryError('Unknown element: {}'.format(elements[i]))
+
 
 def interpret(query):
 	'''Translates a single query to the MongoDB format'''
@@ -95,6 +99,7 @@ def interpret(query):
 
 	return dct
 
+
 def update(d1, d2):
 	'''Update dictionary d1 with d2'''
 	for k, v in d2.iteritems():
@@ -106,6 +111,7 @@ def update(d1, d2):
 					d1[k].update(d2[k])
 		else:
 			d1[k] = v
+
 
 def translate(queries_lst):
 	'''Translates a list of queries to the MongoDB format'''

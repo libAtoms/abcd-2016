@@ -1,13 +1,15 @@
 __author__ = 'Patrick Szmucer'
 
+import abcd.results as results
 import json
 import subprocess
-from base64 import b64encode, b64decode
-import abcd.results as results
 from abcd.backend import CommunicationError
+from base64 import b64encode, b64decode
+
 
 # Possible response codes from remote. See server.py for explanation
 response_codes = ['200', '201', '202', '203', '204', '220', '221', '222', '223', '224']
+
 
 def result_from_dct(result_type, **kwargs):
     '''
@@ -36,6 +38,7 @@ def result_from_dct(result_type, **kwargs):
                                         kwargs['_msg'])
     else:
         raise NotImplementedError(result_type)
+
 
 def communicate_with_remote(host, command):
     '''

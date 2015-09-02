@@ -1,5 +1,8 @@
-from itertools import product
+__author__ = 'Patrick Szmucer'
+
 from ase.data import chemical_symbols
+from itertools import product
+
 
 def interpret(key, op, val):
     # Returns a list of ASEdb queries, where elements in this list
@@ -36,6 +39,7 @@ def interpret(key, op, val):
         raise QueryError('{} {} {}'.format(key, op, val))
 
     return queries
+
 
 def translate_query(query):
     '''Translates the MongoDB query to the ASEdb query'''

@@ -1,26 +1,20 @@
 from __future__ import print_function
-
-import os
-import sys
 import argparse
-import tarfile
+import os
 import StringIO
-from base64 import b64encode, b64decode
-
-from ase.utils import plural
+import sys
+import tarfile
+from ase.atoms import Atoms
+from ase.db.core import convert_str_to_float_or_str
 from ase.io import read as ase_read
 from ase.io import write as ase_write
-from ase.db.summary import Summary
-from ase.calculators.calculator import get_calculator
-from ase.db.core import convert_str_to_float_or_str
-from ase.atoms import Atoms
-
-from structurebox import StructureBox
 from authentication import Credentials
+from base64 import b64encode, b64decode
+from config import read_config_file, create_config_file, config_file_exists
 from query import translate
 from results import UpdateResult, InsertResult
+from structurebox import StructureBox
 from table import print_keys_table, print_rows, print_long_row
-from config import read_config_file, create_config_file, config_file_exists
 
 description = ''
 
@@ -137,10 +131,12 @@ def main():
         else:
             raise
 
+
 def to_stderr(*args):
     '''Prints to stderr'''
     if args and any(not arg.isspace() for arg in args):
         print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
+
 
 def untar_file(fileobj, path_prefix, quiet=False):
     try:
@@ -157,12 +153,14 @@ def untar_file(fileobj, path_prefix, quiet=False):
     finally:
         tar.close()
 
+
 def untar_and_delete(tar_files, path_prefix):
     # Untar individual tarballs
     for tarball in tar_files:
         with open(tarball, 'r') as f:
             untar_file(f, path_prefix, quiet=True)
         os.remove(tarball)
+
 
 def print_result(result, multiconfig_files, database):
 
@@ -252,6 +250,7 @@ def print_result(result, multiconfig_files, database):
         print('The following files were not included as original files:')
         for f in multiconfig_files:
             print('  ', f)
+
 
 def run(args, sys_args, verbosity):
 

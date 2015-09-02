@@ -1,14 +1,5 @@
 __author__ = 'Patrick Szmucer'
 
-import asedb_sqlite3_backend as backend
-import argparse
-import sys
-from base64 import b64encode, b64decode
-import json
-from abcd.util import dict2atoms, atoms2dict
-from abcd.structurebox import StructureBox
-from asedb_sqlite3_backend import ASEdbSQlite3Backend as Backend
-
 '''
 Response codes:
 201: b64encoded string
@@ -21,6 +12,16 @@ Response codes:
 223: json and b64encoded AddKvpResult dictionary
 224: json and b64encoded RemoveKeysResult dictionary
 '''
+
+import argparse
+import asedb_sqlite3_backend as backend
+import json
+import sys
+from abcd.structurebox import StructureBox
+from abcd.util import dict2atoms, atoms2dict
+from asedb_sqlite3_backend import ASEdbSQlite3Backend as Backend
+from base64 import b64encode, b64decode
+
 
 def main():
 	# Get the username

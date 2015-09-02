@@ -9,6 +9,8 @@
 
 ## asedb-based backend
 
+* 'k!=v' looks for configurations containing a key "k" which is different from "v", instead of looking for all configurations for which !(k=v) evaluates to True (so configurations not containing "k" are not returned).
+
 ## mongodb-based backend
 
 * Update it so it conforms to the Backend class
