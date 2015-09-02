@@ -12,6 +12,7 @@ from authentication import Credentials
 from base64 import b64encode, b64decode
 from config import read_config_file, create_config_file, config_file_exists
 from query import translate
+from random import randint
 from results import UpdateResult, InsertResult
 from structurebox import StructureBox
 from table import print_keys_table, print_rows, print_long_row
@@ -433,7 +434,13 @@ def run(args, sys_args, verbosity):
             if len(name) > 15:
                 name = str[:15]
             names.append(name)
-            unique_ids.append(atoms.info['uid'])
+
+            # The Atoms object should have a uid, but if it doesn't
+            # then use uid='0'.
+            if 'uid' in atoms.info and atoms.info['uid'] is not None:
+                unique_ids.append(atoms.info['uid'])
+            else:
+                unique_ids.append('0')
             original_files.append(contents)
 
         # Mangle the names
@@ -598,6 +605,12 @@ def run(args, sys_args, verbosity):
             # Now walk the tree to find all parsed files
             walk(tree[dirname], atoms_to_store)
 
+        # Chech if the atoms we are about to insert/update have a uid.
+        # If not, attach one.
+        for atoms in atoms_to_store:
+            if not 'uid' in atoms.info or atoms.info['uid'] is None:
+                atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
+
         # Store/update parsed atoms
         if args.store:
             result = box.insert(token, atoms_to_store)
@@ -634,7 +647,8 @@ def run(args, sys_args, verbosity):
                             sort=sort, reverse=args.reverse,
                             limit=args.limit, keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
-            print(atoms.info['uid'])
+            uid = atoms.info.get('uid')
+            print('  ' + uid)
 
     # Show the database
     elif args.show:
