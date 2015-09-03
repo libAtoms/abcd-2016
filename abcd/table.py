@@ -71,11 +71,13 @@ def print_kvps(kvps):
 
 
 def filter_keys(keys_list, show_keys, omit_keys):
-    '''Decides which keys ti show given show_keys and omit_keys lists'''
+    '''Decides which keys to show given show_keys and omit_keys lists'''
+    if show_keys:
+        return show_keys
+
     new_keys_list = list(keys_list)
-    not_displaying = set()
     for key in keys_list:
-        if key in omit_keys or (show_keys != [] and key not in show_keys):
+        if key in omit_keys:
             new_keys_list.remove(key)
     return new_keys_list
 
@@ -93,15 +95,17 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
         keys = keys | set(dct.keys())
     keys_list = list(keys)
 
-    # Reorder the list
-    order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'numbers',
+    # Decide which keys to show/omit
+    keys_list = filter_keys(keys_list, show_keys, omit_keys)
+
+    # Reorder the list, but only if show_keys was []
+    if not show_keys:
+        order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'numbers',
             'config_type', 'pbc', 'positions', 'cell', 'stress', 'forces',
             'energy', 'calculator', 'calculator_parameters']
-    for key in reversed(order):
-        if key in keys_list:
-            keys_list.insert(0, keys_list.pop(keys_list.index(key)))
-
-    keys_list = filter_keys(keys_list, show_keys, omit_keys)
+        for key in reversed(order):
+            if key in keys_list:
+                keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
     if not keys_list:
         print '  No keys to display'

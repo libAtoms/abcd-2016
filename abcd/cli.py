@@ -82,7 +82,7 @@ def main():
     add('-i', '--reverse', action='store_true', default=False, help='Reverses the sorting order')
     add('-c', '--count', action='store_true',
         help='Count number of selected rows.')
-    add('-k', '--show-keys', metavar='K1,K2,...', default='', help='Select only specified keys')
+    add('-k', '--show-keys', metavar='K1,K2,...', default='', help='Select only specified keys. "+" for all.')
     add('-n', '--omit-keys', metavar='K1,K2,...', default='', help='Don\'t select these keys')
     add('-t', '--add-keys', metavar='K1=V1,...', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
@@ -261,6 +261,11 @@ def run(args, sys_args, verbosity):
 
     # Get the query
     query = translate(args.query)
+
+    # Plus resets args.omit_keys
+    if args.show_keys == '+':
+        args.show_keys = ''
+        args.omit_keys = ''
 
     # Decide which keys to show
     keys = args.show_keys.split(',')
