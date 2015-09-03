@@ -76,8 +76,7 @@ def main():
     add('--pretty', action='store_true', default=True, help='Use pretty tables')
     add('--no-pretty', action='store_false', dest='pretty', help='Don\'t use pretty tables')
     add('-m', '--limit', type=int, default=0, metavar='N',
-        help='Show only first N rows (default is 500 rows).  Use --limit=0 '
-        'to show all.')
+        help='Show only first N rows. Use 0 to show all (default).')
     add('-z', '--sort', metavar='COL', default='',
         help='Specify the column to sort the rows by. Default is increasing order \n(change it using --reverse)')
     add('-i', '--reverse', action='store_true', default=False, help='Reverses the sorting order')
