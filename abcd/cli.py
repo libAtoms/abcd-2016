@@ -269,16 +269,13 @@ def run(args, sys_args, verbosity):
 
     # Decide which keys to show
     keys = args.show_keys.split(',')
-    if '' in keys:
-        keys.remove('')
+    keys = [a for a in keys if a not in (None, '', ' ')]
     
     omit_keys = args.omit_keys.split(',')
-    if '' in omit_keys:
-        omit_keys.remove('')
+    omit_keys = [a for a in omit_keys if a not in (None, '', ' ')]
 
     sort = args.sort.split(',')
-    if '' in sort:
-        sort.remove('')
+    sort = [a for a in sort if a not in (None, '', ' ')]
 
     # Get kvp
     kvp = {}
@@ -292,6 +289,7 @@ def run(args, sys_args, verbosity):
     if args.remove_keys:
         for key in args.remove_keys.split(','):
             remove_keys.append(key)
+    remove_keys = [a for a in remove_keys if a not in (None, '', ' ')]
 
 
     #
