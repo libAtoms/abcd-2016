@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import getpass
 import os
 import StringIO
 import sys
@@ -314,7 +315,7 @@ def run(args, sys_args, verbosity):
         user = args.user
 
     if args.password == []:
-        password = raw_input('Password: ')
+        password = getpass.getpass()
     else:
         password = args.password
 
