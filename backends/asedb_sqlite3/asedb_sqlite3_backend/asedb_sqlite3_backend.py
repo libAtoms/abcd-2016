@@ -114,7 +114,10 @@ class ASEdbSQlite3Backend(Backend):
         self.root_dir = os.path.join(self.dbs_path, home)
 
         # Make sure the database name is safe and connect to it
-        self.database = database
+        if database == '':
+            self.database = None
+        else:
+            self.database = database
         if self.database:
             self.database = os.path.basename(self.database)
             if self.database.endswith('.db'):
@@ -291,8 +294,8 @@ class ASEdbSQlite3Backend(Backend):
         else:
             return False
 
-    @read_only
     @require_database
+    @read_only
     def insert(self, auth_token, atoms_list):
 
         # Make sure we have a list
@@ -335,8 +338,8 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Inserted {}/{} configurations.'.format(len(inserted_ids), n_atoms)
         return results.InsertResult(inserted_ids=inserted_ids, skipped_ids=skipped_ids, msg=msg)
 
-    @read_only
     @require_database
+    @read_only
     def update(self, auth_token, atoms_list, upsert, replace):
         '''Takes the Atoms object or a list of Atoms objects'''
 
@@ -426,8 +429,8 @@ class ASEdbSQlite3Backend(Backend):
         return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, 
                                     upserted_ids=upserted_ids, replaced_ids=replaced_ids, msg=msg)
 
-    @read_only
     @require_database
+    @read_only
     def remove(self, auth_token, filter, just_one):
 
         if self.remote:
@@ -469,8 +472,8 @@ class ASEdbSQlite3Backend(Backend):
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(lambda x: row2atoms(x, keys, omit_keys), rows_iter))
 
-    @read_only
     @require_database
+    @read_only
     def add_keys(self, auth_token, filter, kvp):
 
         if self.remote:
@@ -483,8 +486,8 @@ class ASEdbSQlite3Backend(Backend):
         msg = 'Added {} key-value pairs in total to {} configurations'.format(n, len(ids))
         return results.AddKvpResult(modified_ids=[], no_of_kvp_added=n, msg=msg)
 
-    @read_only
     @require_database
+    @read_only
     def remove_keys(self, auth_token, filter, keys):
         
         if self.remote:

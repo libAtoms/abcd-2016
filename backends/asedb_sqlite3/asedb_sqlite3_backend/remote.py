@@ -7,12 +7,13 @@ __author__ = 'Patrick Szmucer'
 import abcd.results as results
 import json
 import subprocess
-from abcd.backend import CommunicationError
+from abcd.backend import ReadError, WriteError, CommunicationError
 from base64 import b64encode, b64decode
 
 
 # Possible response codes from remote. See server.py for explanation
-response_codes = ['200', '201', '202', '203', '204', '220', '221', '222', '223', '224']
+response_codes = ['200', '201', '202', '203', '204', '220', '221', 
+                    '222', '223', '224', '400', '401', '402']
 
 
 def result_from_dct(result_type, **kwargs):
@@ -86,5 +87,11 @@ def communicate_with_remote(host, command):
         return result_from_dct('AddKvpResult', **json.loads(b64decode(data)))
     elif response_code == '224':
         return result_from_dct('RemoveKeysResult', **json.loads(b64decode(data)))
+    elif response_codes == '400':
+        raise RuntimeError(b64decode(data))
+    elif response_code == '401':
+        raise ReadError(b64decode(data))
+    elif response_code == '402':
+        raise WriteError(b64decode(data))
     else:
         raise CommunicationError('Unknown response code: {}'.format(response_code))
