@@ -5,7 +5,6 @@ import json
 import numpy as np
 import os
 import re
-import time
 import abcd.backend
 import abcd.results as results
 from abcd.authentication import AuthenticationError
@@ -259,21 +258,8 @@ class ASEdbSQlite3Backend(Backend):
         uid is already present in the database. Returns a uid of the inserted
         object.
         '''
-        # Add a unique id if it's not present
         if not 'uid' in atoms.info or atoms.info['uid'] is None:
             atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
-        uid = atoms.info['uid']
-
-        # Add a creation time if it's not present
-        if not 'c_time' in atoms.info:
-            atoms.info['c_time'] = int(time.time())
-
-        # Change the modification time
-        atoms.info['m_time'] = int(time.time())
-
-        # Update the formula and n_atoms
-        atoms.info['formula'] = atoms.get_chemical_formula()
-        atoms.info['n_atoms'] = len(atoms.numbers)
 
         self._preprocess(atoms)
         info, arrays = get_info_and_arrays(atoms, plain_arrays=False)
@@ -281,7 +267,7 @@ class ASEdbSQlite3Backend(Backend):
         # Write it to the database
         self.connection.write(atoms=atoms, key_value_pairs=info, data=arrays)
 
-        return uid
+        return atoms.info['uid']
 
     def _uid_exists(self, uid):
         '''

@@ -100,7 +100,7 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
 
     # Reorder the list, but only if show_keys was []
     if not show_keys:
-        order = ['uid', 'c_time', 'm_time', 'formula', 'n_atoms', 'numbers',
+        order = ['uid', 'c_time', 'formula', 'n_atoms', 'numbers',
             'config_type', 'pbc', 'positions', 'cell', 'stress', 'forces',
             'energy', 'calculator', 'calculator_parameters']
         for key in reversed(order):
@@ -260,7 +260,6 @@ def print_long_row(atoms):
     g = []
     g.append(('uid', info.pop('uid', None)))
     g.append(('c_time', info.pop('c_time', None)))
-    g.append(('m_time', info.pop('m_time', None)))
     print_kvps(g)
 
     # Formula and number of atoms

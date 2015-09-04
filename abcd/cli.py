@@ -5,6 +5,7 @@ import os
 import StringIO
 import sys
 import tarfile
+import time
 from ase.atoms import Atoms
 from ase.db.core import convert_str_to_float_or_str
 from ase.io import read as ase_read
@@ -607,11 +608,19 @@ def run(args, sys_args, verbosity):
             # Now walk the tree to find all parsed files
             walk(tree[dirname], atoms_to_store)
 
-        # Chech if the atoms we are about to insert/update have a uid.
-        # If not, attach one.
         for atoms in atoms_to_store:
+            # Check if the configuration has a uid.
+            # If not, attach one.
             if not 'uid' in atoms.info or atoms.info['uid'] is None:
                 atoms.info['uid'] = '%x' % randint(16**14, 16**15 - 1)
+
+            # Add c_time, formula and n_atoms
+            if not 'c_time' in atoms.info:
+                atoms.info['c_time'] = int(time.time())
+            if not 'formula' in atoms.info:
+                atoms.info['formula'] = atoms.get_chemical_formula()
+            if not 'n_atoms' in atoms.info:
+                atoms.info['n_atoms'] = len(atoms.numbers)
 
         # Store/update parsed atoms
         if args.store:
