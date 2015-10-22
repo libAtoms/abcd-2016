@@ -92,23 +92,36 @@ def setup():
         parser.add_section('ase-db')
         with open(CONFIG_PATH, 'w') as cfg_file:
             parser.write(cfg_file)
+        print 'Creating a config file at', CONFIG_PATH
 
-    # Make sure appropriate sections exist
+    # Read the config file
     parser = SafeConfigParser()
     parser.read(CONFIG_PATH)
 
-    if not parser.has_option('ase-db', 'dbs_path'):
-        if not parser.has_section('ase-db'):
-            parser.add_section('ase-db')
-        if not parser.has_option('ase-db', 'dbs_path'):
-            # Ask the user for the path to the databases folder
-            dbs_path = os.path.expanduser(raw_input('Path for the databases folder: '))
-            parser.set('ase-db', 'dbs_path', dbs_path)
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            parser.write(cfg_file)
+    # Make sure that the ase-db section exists
+    if not parser.has_section('ase-db'):
+        parser.add_section('ase-db')
+
+    set_dbs_path = True
+    if parser.has_option('ase-db', 'dbs_path'):
+        print 'Your path to the databases folder is', parser.get('ase-db', 'dbs_path')
+        response = raw_input('Do you want to change it? [y/n]: ')
+        if response not in ['Y', 'y', 'yes']:
+            set_dbs_path = False
+
+    # Ask the user for the path to the databases folder
+    if set_dbs_path:
+        userInput = raw_input('Path for the databases folder (default is ~/abcd_databases): ')
+        if not userInput:
+            # No input from user. Set a default directory
+            userInput = '~/abcd_databases'
+        dbs_path = os.path.expanduser(userInput)
+        parser.set('ase-db', 'dbs_path', dbs_path)
     else:
-        dbs_path = get_dbs_path()
-        print '  Config file found at {}'.format(CONFIG_PATH)
+        dbs_path = parser.get('ase-db', 'dbs_path')
+
+    with open(CONFIG_PATH, 'w') as cfg_file:
+        parser.write(cfg_file)
 
     # Path to the "all" folder
     all_path = os.path.join(dbs_path, 'all')
