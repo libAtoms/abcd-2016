@@ -2,7 +2,6 @@
 
 __author__ = 'Martin Uhrin'
 
-
 class StructureBox(object):
 
     class BackendOpen:
@@ -40,9 +39,9 @@ class StructureBox(object):
         with StructureBox.BackendOpen(self.backend):
             return self.backend.update(auth_token, atoms, upsert, replace)
 
-    def find(self, auth_token, filter, sort=[], reverse=False, limit=0, keys=[], omit_keys=[]):
+    def find(self, auth_token, filter, sort={}, limit=0, keys=None, omit_keys=False):
         with StructureBox.BackendOpen(self.backend):
-            return self.backend.find(auth_token, filter, sort, reverse, limit, keys, omit_keys)
+            return self.backend.find(auth_token, filter, sort, limit, keys, omit_keys)
 
     def remove(self, auth_token, filter, just_one=True):
         with StructureBox.BackendOpen(self.backend):

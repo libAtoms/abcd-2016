@@ -5,6 +5,25 @@ from ase.atoms import Atoms
 from ase.calculators.calculator import get_calculator, all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
 
+def filter_keys(keys_list, keys, omit_keys):
+    '''Decides which keys to show given keys and omit_keys'''
+    
+    new_keys_list = list(keys_list)
+    if omit_keys:
+        if keys is not None:
+            for key in keys_list:
+                if key in keys:
+                    new_keys_list.remove(key)
+        else:
+            # Omit all keys
+            new_keys_list = []
+    else:
+        if keys is not None:
+            for key in keys_list:
+                if key not in keys:
+                    new_keys_list.remove(key)
+    return new_keys_list
+
 
 def get_info_and_arrays(atoms, plain_arrays):
     """

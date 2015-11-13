@@ -7,10 +7,17 @@ commands understood by the native storage format being used be it SQL,
 a filesystem, MongoDB or others.
 """
 
-__author__ = 'Martin Uhrin'
+__author__ = 'Martin Uhrin, Patrick Szmucer'
 
 from abc import ABCMeta
 from abc import abstractmethod
+
+
+def enum(*sequential):
+    enums = dict(zip(sequential, range(len(sequential))))
+    return type('Enum', (), enums)
+
+Direction = enum('ASCENDING', 'DESCENDING')
 
 
 class Backend(object):
@@ -87,18 +94,20 @@ class Backend(object):
         pass
 
     @abstractmethod
-    def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
+    def find(self, auth_token, filter, sort, limit, keys, omit):
         """
         Find entries that match the filter
 
         :param AuthToken auth_token: Authorisation token
         :param filter: Filter
         :type filter: list of Conditions
-        :param list sort: Sort in increasing order
-        :param bool reverse: Reverse the sorting order
+        :param dict sort: Dictionary where keys are columns byt which to sort
+            end values are either abcd.Direction.ASCENDING or abcd.Direction.DESCENDING
         :param int limit: limit the number of returned entries
-        :param list keys: keys to be returned. Empty for all
-        :param list keys: keys to be omitted
+        :param list keys: keys to be returned. None for all.
+        :param bool omit: if True, the keys parameter will be interpreted
+            as the keys to omit (all keys except the ones specified will
+            be returned).
         :return:
         :rtype: Iterator to the Atoms object
         """

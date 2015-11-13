@@ -10,7 +10,7 @@ setup(
     description='ASEdb SQLite3 backend for Atomic structure sharing framework',
     author='Patrick Szmucer',
     author_email='pjs87@cam.ac.uk',
-    version='0.0.0',
+    version='0.1.0',
     install_requires=['abcd'],
     packages=find_packages(),
     classifiers=[

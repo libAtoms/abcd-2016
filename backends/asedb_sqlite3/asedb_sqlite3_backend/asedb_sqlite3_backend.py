@@ -10,7 +10,7 @@ import abcd.results as results
 from abcd.authentication import AuthenticationError
 from abcd.backend import Backend, ReadError, WriteError
 from abcd.query import QueryError, translate
-from abcd.util import get_info_and_arrays, atoms2dict, dict2atoms
+from abcd.util import get_info_and_arrays, atoms2dict, dict2atoms, filter_keys
 from ase.atoms import Atoms
 from ase.calculators.calculator import all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
@@ -25,10 +25,13 @@ from util import get_dbs_path, reserved_usernames
 
 
 def row2atoms(row, keys, omit_keys):
+    """
+    keys: keys to show. None for all
+    omit_keys: if true, all keys not in "keys" will be shown
+    """
     atoms = row.toatoms()
 
     # Add additional info
-    atoms.info['unique_id'] = row.unique_id
     if row._keys:
         atoms.info.update(row.key_value_pairs)
 
@@ -44,18 +47,11 @@ def row2atoms(row, keys, omit_keys):
             except (TypeError, ValueError):
                 atoms.info[key] = value
 
-    keys_to_delete = ['unique_id']
-    if keys != []:
-        for key in atoms.info:
-            if key not in keys:
-                keys_to_delete.append(key)
+    # unique_id is added automatically by ASEdb, we don't need it
+    atoms.info.pop('unique_id', None)
 
-    for key in omit_keys:
-        keys_to_delete.append(key)
-
-    for key in keys_to_delete:
-        atoms.info.pop(key, None)
-
+    filtered_keys = filter_keys(atoms.info.keys(), keys, omit_keys)
+    atoms.info = {k: v for k, v in atoms.info.iteritems() if k in filtered_keys}
     return atoms
 
 
@@ -134,12 +130,19 @@ class ASEdbSQlite3Backend(Backend):
 
         super(ASEdbSQlite3Backend, self).__init__()
 
-    def _select(self, query, sort=[], reverse=False, limit=0):
+    def _select(self, query, sort={}, limit=0):
         query = translate_query(query)
-        if sort == []:
+        if sort == {}:
             sort = 'id'
+            reverse = False
         else:
-            sort = sort[0]
+            # This backend does not support multicolumn sorting.
+            # Only sort by first column.
+            sort, direction = sort.iteritems().next()
+            if direction == abcd.Direction.ASCENDING:
+                reverse = False
+            else:
+                reverse = True
         rows = []
         ids = []
         for q in query:
@@ -435,7 +438,7 @@ class ASEdbSQlite3Backend(Backend):
         return results.RemoveResult(removed_count=len(ids), msg=msg)
 
     @require_database
-    def find(self, auth_token, filter, sort, reverse, limit, keys, omit_keys):
+    def find(self, auth_token, filter, sort, limit, keys, omit_keys):
 
         if self.remote:
             filter_out = b64encode(json.dumps(filter))
@@ -445,15 +448,13 @@ class ASEdbSQlite3Backend(Backend):
 
             cmd = 'find {} {}'.format(self.database, filter_out)
             cmd += ' --sort {}'.format(sort_out)
-            if reverse:
-                cmd += ' --reverse'
             cmd += ' --limit {}'.format(limit)
             cmd += ' --keys {}'.format(keys_out)
             cmd += ' --omit-keys {}'.format(omit_keys_out)
             atoms_dcts_list = communicate_with_remote(self.remote, cmd)
             return ASEdbSQlite3Backend.Cursor(iter([dict2atoms(dct, True) for dct in atoms_dcts_list]))
 
-        rows_iter = self._select(filter, sort=sort, reverse=reverse, limit=limit)
+        rows_iter = self._select(filter, sort=sort, limit=limit)
 
         # Convert it to the Atoms iterator.
         return ASEdbSQlite3Backend.Cursor(imap(lambda x: row2atoms(x, keys, omit_keys), rows_iter))

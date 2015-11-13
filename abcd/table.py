@@ -4,7 +4,7 @@ import collections
 import numpy as np
 import time
 from prettytable import PrettyTable
-from util import atoms2dict
+from util import atoms2dict, filter_keys
 
 
 def trim(val, length):
@@ -68,18 +68,6 @@ def print_kvps(kvps):
         s += str(format_value(t[1], t[0]))
         s += '\n'
     print s
-
-
-def filter_keys(keys_list, show_keys, omit_keys):
-    '''Decides which keys to show given show_keys and omit_keys lists'''
-    if show_keys:
-        return show_keys
-
-    new_keys_list = list(keys_list)
-    for key in keys_list:
-        if key in omit_keys:
-            new_keys_list.remove(key)
-    return new_keys_list
 
 
 def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):

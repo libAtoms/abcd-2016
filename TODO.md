@@ -7,7 +7,6 @@
 * Add "interactive" mode to CLI (i.e. it doesn't auto return)
 * Make the ASE install automatic (currently it asks the user to manually install the latest development version from https://wiki.fysik.dtu.dk/ase/download.html#latest-development-release)
 * copy/move files from one database to another, including a new database
-* Multi-column sorting on the summary table (using a dictionary where keys are column names and values are either ASCENDING or DESCENDING).
 * Ability to add keys with commas
 * Add the --unique option to the command line for the summary table
 

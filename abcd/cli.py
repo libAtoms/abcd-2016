@@ -6,6 +6,7 @@ import StringIO
 import sys
 import tarfile
 import time
+from abcd import Direction
 from ase.atoms import Atoms
 from ase.db.core import convert_str_to_float_or_str
 from ase.io import read as ase_read
@@ -31,7 +32,8 @@ examples = '''
     abcd db1.db \'energy>0.8\' --remove   (remove selected configurations)
     abcd db1.db --store conf1.xyz conf2.xyz info.txt   (store original files in the database)
     abcd db1.db --store configs/   (store the whole directory in the database)
-    abcd db1.db --omit-keys 'user,id' --show  (show the database, but omit keys user and id)
+    abcd db1.db --keys 'user,id' --omit-keys --show  (show the database, but omit keys user and id)
+    abcd db1.db --sort 'energy:A,age:D' --show  (sort by energy (ascending) and age (descending))
 '''
 
 def main():
@@ -78,13 +80,12 @@ def main():
     add('--no-pretty', action='store_false', dest='pretty', help='Don\'t use pretty tables')
     add('-m', '--limit', type=int, default=0, metavar='N',
         help='Show only first N rows. Use 0 to show all (default).')
-    add('-z', '--sort', metavar='COL', default='',
-        help='Specify the column to sort the rows by. Default is increasing order \n(change it using --reverse)')
-    add('-i', '--reverse', action='store_true', default=False, help='Reverses the sorting order')
+    add('-z', '--sort', metavar='COL1:[A/D],COL2[A/D]...', default='',
+        help='Specify columns to sort the rows by (default direction is ascending). Multicolumn sorting might not be supported by all backends.')
     add('-c', '--count', action='store_true',
         help='Count number of selected rows.')
-    add('-k', '--show-keys', metavar='K1,K2,...', default='', help='Select only specified keys. "+" for all.')
-    add('-n', '--omit-keys', metavar='K1,K2,...', default='', help='Don\'t select these keys')
+    add('-k', '--keys', metavar='K1,K2,...', help='Select only specified keys. "+" for all. See also --omit-keys.')
+    add('-n', '--omit-keys', action='store_true', help='Omit keys specified with --keys argument')
     add('-t', '--add-keys', metavar='K1=V1,...', help='Add key-value pairs')
     add('--remove-keys', metavar='K1,K2,...', help='Remove keys')
     add('--remove', action='store_true',
@@ -263,20 +264,31 @@ def run(args, sys_args, verbosity):
     # Get the query
     query = translate(args.query)
 
-    # Plus resets args.omit_keys
-    if args.show_keys == '+':
-        args.show_keys = ''
-        args.omit_keys = ''
+    if args.omit_keys and args.keys is None:
+        print('Error: No keys to omit specified. Use --keys')
+        sys.exit()
+    omit_keys = args.omit_keys
 
-    # Decide which keys to show
-    keys = args.show_keys.split(',')
-    keys = [a for a in keys if a not in (None, '', ' ')]
-    
-    omit_keys = args.omit_keys.split(',')
-    omit_keys = [a for a in omit_keys if a not in (None, '', ' ')]
+    if args.keys is None or args.keys == '+':
+        keys = None
+    else:
+        keys = args.keys.split(',')
+        keys = [k for k in keys if k not in ('', ' ')]
 
-    sort = args.sort.split(',')
-    sort = [a for a in sort if a not in (None, '', ' ')]
+    sort_list = args.sort.split(',')
+    sort_list = [s for s in sort_list if s not in (None, '', ' ')]
+    sort = {}
+    for s in sort_list:
+        if ':' in s:
+            key, direction = s.split(':')
+            if direction in ('A', 'a', 'ascending', 'Ascending', 'ASCENDING'):
+                direction = Direction.ASCENDING
+            elif direction in ('D', 'd', 'descending', 'Descending', 'DESCENDING'):
+                direction = Direction.DESCENDING
+        else:
+            key = s
+            direction = Direction.ASCENDING
+        sort[key] = direction
 
     # Get kvp
     kvp = {}
@@ -351,10 +363,23 @@ def run(args, sys_args, verbosity):
 
         nrows = 0
         list_of_atoms = []
-        omit = omit_keys + ['original_files']
+        # Make sure 'original_files' is omitted
+
+        omit = omit_keys
+        if keys is not None and omit:
+            keys.append('original_files')
+        elif keys is not None and 'original_files' in keys:
+            keys.remove('original_files')
+        elif keys is None and omit:
+            # All keys will be omitted
+            pass
+        else:
+            keys = ['original_files']
+            omit = True
+
         for atoms in box.find(auth_token=token, filter=query, 
-                            sort=sort, reverse=args.reverse,
-                            limit=args.limit, keys=keys, omit_keys=omit):
+                            sort=sort, limit=args.limit, 
+                            keys=keys, omit_keys=omit):
             list_of_atoms.append(atoms)
             nrows += 1
 
@@ -414,8 +439,7 @@ def run(args, sys_args, verbosity):
         skipped_configs = []
         nat = 0
         for atoms in box.find(auth_token=token, filter=query, 
-                        sort=sort, reverse=args.reverse,
-                        limit=args.limit,
+                        sort=sort, limit=args.limit,
                         keys=['original_files', 'uid']):
             nat += 1
 
@@ -644,8 +668,8 @@ def run(args, sys_args, verbosity):
         else:
             lim = args.limit + 1
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, reverse=args.reverse,
-                            limit=lim, keys=keys, omit_keys=omit_keys)
+                            sort=sort, limit=lim, keys=keys, 
+                            omit_keys=omit_keys)
         count = atoms_it.count()
         if args.limit != 0 and count > args.limit:
             count = '{}+'.format(count-1)
@@ -655,8 +679,8 @@ def run(args, sys_args, verbosity):
 
     elif args.ids:
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, reverse=args.reverse,
-                            limit=args.limit, keys=keys, omit_keys=omit_keys)
+                            sort=sort, limit=args.limit, 
+                            keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
             uid = atoms.info.get('uid')
             print('  ' + uid)
@@ -664,15 +688,15 @@ def run(args, sys_args, verbosity):
     # Show the database
     elif args.show:
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, reverse=args.reverse,
-                            limit=args.limit, keys=keys, omit_keys=omit_keys)
+                            sort=sort, limit=args.limit, 
+                            keys=keys, omit_keys=omit_keys)
         print_rows(atoms_it, border=args.pretty, 
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
 
     elif args.long:
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, reverse=args.reverse,
-                            limit=args.limit, keys=keys, omit_keys=omit_keys)
+                            sort=sort, limit=args.limit, 
+                            keys=keys, omit_keys=omit_keys)
         try:
             atoms = next(atoms_it)
         except StopIteration:
@@ -699,7 +723,7 @@ def run(args, sys_args, verbosity):
     # Print info about keys
     else:
         atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, reverse=args.reverse,
-                            limit=args.limit, keys=keys, omit_keys=omit_keys)
+                            sort=sort, limit=args.limit, keys=keys, 
+                            omit_keys=omit_keys)
         print_keys_table(atoms_it, border=args.pretty, 
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
