@@ -1,9 +1,6 @@
 __author__ = 'Patrick Szmucer'
 
-try:
-    from setuptools import setup, find_packages
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='abcd_asedb_sqlite3',

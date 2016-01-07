@@ -1,9 +1,6 @@
 __author__ = 'Martin Uhrin'
 
-try:
-    from setuptools import setup, find_packages
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='abcd_mongodb_backend',

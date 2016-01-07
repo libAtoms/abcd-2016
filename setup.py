@@ -1,11 +1,6 @@
+# Require setuptools for entry_points and find_packages
 
-
-import os
-
-try:
-    from setuptools import setup, find_packages
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='abcd',
@@ -27,9 +22,8 @@ setup(
 
 ase_link = 'https://wiki.fysik.dtu.dk/ase/download.html#latest-development-release'
 try:
-    from ase.svnversion import svnversion
-except:
-    print '\nInstall the development version of ASE from', ase_link
-else:
-    if svnversion.split(':')[-1] < '4590':
-        print '\nMinimum supported ASE version is r4590. You can install the development version of ASE from', ase_link
+    # all the 3.10 series use __version__ not svnversion
+    from ase import __version__
+except ImportError:
+    print('\nInstall the development version of ASE from:')
+    print(ase_link)
