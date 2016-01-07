@@ -1,0 +1,17 @@
+language: python
+python:
+  - 2.7
+  - 3.4
+  - 3.5
+install:
+  # Fetch and install ASE for quippy
+  - git clone https://gitlab.com/ase/ase.git
+  - cd ase; pip install .; cd ..
+  # install abcd
+  - pip install .
+  # install backends
+  - pip install backends/asedb_sqlite3
+  - pip install backends/mongodb
+script:
+  # just run the script for now
+  - abcd
