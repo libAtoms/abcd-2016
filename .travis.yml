@@ -15,3 +15,7 @@ install:
 script:
   # just run the script for now
   - abcd
+matrix:
+  allow_failures:
+    - python: 3.4
+    - python: 3.5
