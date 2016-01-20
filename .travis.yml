@@ -13,8 +13,10 @@ install:
   - pip install backends/asedb_sqlite3
   - pip install backends/mongodb
 script:
-  # just run the script for now
+  # run the script to make sure it is installed
   - abcd
+  # pytest tests
+  - py.test
 matrix:
   allow_failures:
     - python: 3.4

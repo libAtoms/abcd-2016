@@ -46,7 +46,7 @@ class UsernameAndPassword(Credentials):
         # WARNING: This provides no security, just mild obfuscation from a
         # glancing user
         self._password = base64.b64encode(password)
-        super(Credentials, UsernameAndPassword).__init__(username)
+        super(UsernameAndPassword, self).__init__(username)
 
     @property
     def password(self):

@@ -9,6 +9,7 @@ setup(
     author_email='martin.uhrin@epfl.ch, pjs87@cam.ac.uk',
     version='0.1.0',
     install_requires=['prettytable', 'numpy'],
+    tests_require=['pytest'],
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 2.7",
