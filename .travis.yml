@@ -6,7 +6,7 @@ python:
 install:
   # Fetch and install ASE for quippy
   - git clone https://gitlab.com/ase/ase.git
-  - cd ase; pip install .; cd ..
+  - cd ase; pip install .; cd ..; rm -rf ase
   # install abcd
   - pip install .
   # install backends
