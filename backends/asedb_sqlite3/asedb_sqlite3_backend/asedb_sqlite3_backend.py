@@ -394,7 +394,10 @@ class ASEdbSQlite3Backend(Backend):
                 query = translate(['uid={}'.format(uid)])
                 if not replace:
                     # Get the existing Atoms object from the database
-                    atoms_it = self.find(auth_token, query, [], False, 1, [], [])
+                    atoms_it = self.find(auth_token=auth_token,
+                                         filter=query, sort={},
+                                         limit=1, keys=None,
+                                         omit_keys=False)
                     old_atoms = next(atoms_it)
 
                      # Convert atoms to dictionaries so it's easier to update them

@@ -6,7 +6,7 @@ __author__ = 'Patrick Szmucer'
 
 import abcd.results as results
 import json
-import subprocess
+from subprocess import Popen, PIPE
 from abcd.backend import ReadError, WriteError, CommunicationError
 from base64 import b64encode, b64decode
 
@@ -50,15 +50,12 @@ def communicate_with_remote(host, command):
     Sends a command to the remote host and interprets and returns the response.
     """
 
-    # Send command via the ssh to the remote host
     tty_flag = '-T'
-    stdout=subprocess.PIPE
-    stderr=subprocess.PIPE
+    ssh_call = 'ssh -q {} {} '.format(tty_flag, host)
 
-    ssh_call = 'ssh -q {} {} '.format(tty_flag, host) + '\' {}\''.format(command)
-
-    process = subprocess.Popen(ssh_call, shell=True, stdout=stdout, stderr=stderr)
-    stdout, stderr = process.communicate()
+    # Pipe the command to the remote host via ssh
+    process = Popen(ssh_call, shell=True, stdout=PIPE, stderr=PIPE, stdin=PIPE)
+    stdout, stderr = process.communicate(command)
 
     if len(stdout) < 5 or stdout[3] != ':':
         raise CommunicationError(stdout + '\n' + stderr)
@@ -87,7 +84,7 @@ def communicate_with_remote(host, command):
         return result_from_dct('AddKvpResult', **json.loads(b64decode(data)))
     elif response_code == '224':
         return result_from_dct('RemoveKeysResult', **json.loads(b64decode(data)))
-    elif response_codes == '400':
+    elif response_code == '400':
         raise RuntimeError(b64decode(data))
     elif response_code == '401':
         raise ReadError(b64decode(data))

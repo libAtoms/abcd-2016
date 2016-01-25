@@ -349,11 +349,11 @@ def run(args, sys_args, verbosity):
     # Extract a configuration from the database and write it
     # to the specified file.
     elif args.write_to_file:
-        filename = args.write_to_file
-        if '.' in filename:
-            filename, display_format = filename.split('.')
-        else:
+        filename, display_format = os.path.splitext(args.write_to_file)
+        if not display_format:
             display_format = 'xyz'
+        elif display_format[0] == '.':
+            display_format = display_format[1:]
 
         # displayed_format will appear in the file name
         if display_format == 'xyz':
@@ -363,8 +363,8 @@ def run(args, sys_args, verbosity):
 
         nrows = 0
         list_of_atoms = []
-        # Make sure 'original_files' is omitted
 
+        # Make sure 'original_files' is omitted
         omit = omit_keys
         if keys is not None and omit:
             keys.append('original_files')
