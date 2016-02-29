@@ -1,5 +1,9 @@
 import os
-from ConfigParser import SafeConfigParser
+# PY2 compat
+try:
+    from ConfigParser import SafeConfigParser
+except ImportError:
+    from configparser import SafeConfigParser
 
 CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
 

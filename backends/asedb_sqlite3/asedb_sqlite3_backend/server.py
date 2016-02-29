@@ -1,8 +1,8 @@
 """
 Interface for the ASEdb backend. Its purpose is to be triggered
-by the communicate_with_remote function from remote.py, 
+by the communicate_with_remote function from remote.py,
 communicate with the ASEdb backend and print results/data
-to standard output. The output is b64-encoded and should be in 
+to standard output. The output is b64-encoded and should be in
 a form XYZ:OUTPUT, where XYZ is the response code which indicates
 what type of output was produced (see below).
 
@@ -21,17 +21,19 @@ Response codes:
 402: b64encoded string - WriteError
 """
 
-__author__ = 'Patrick Szmucer'
+from __future__ import print_function
 
 import argparse
-import asedb_sqlite3_backend as backend
+from . import asedb_sqlite3_backend as backend
 import json
 import sys
 from abcd.backend import ReadError, WriteError
 from abcd.structurebox import StructureBox
 from abcd.util import dict2atoms, atoms2dict
-from asedb_sqlite3_backend import ASEdbSQlite3Backend as Backend
+from .asedb_sqlite3_backend import ASEdbSQlite3Backend as Backend
 from base64 import b64encode, b64decode
+
+__author__ = 'Patrick Szmucer'
 
 
 def error_handler(func):
@@ -39,11 +41,11 @@ def error_handler(func):
         try:
             return func(*args, **kwargs)
         except ReadError as e:
-            print '401:' + b64encode(str(e))
+            print('401:' + b64encode(str(e)))
         except WriteError as e:
-            print '402:'+ b64encode(str(e))
+            print('402:'+ b64encode(str(e)))
         except Exception as e:
-            print '400:' + b64encode(str(e))
+            print('400:' + b64encode(str(e)))
     return func_wrapper
 
 
@@ -51,7 +53,7 @@ def error_handler(func):
 def backendList(user):
     box = StructureBox(Backend(user=user))
     dbs = box.list('')
-    print '202:' + b64encode(json.dumps(dbs))
+    print('202:' + b64encode(json.dumps(dbs)))
 
 
 @error_handler
@@ -60,7 +62,7 @@ def backendInsert(database, user, atoms):
     atoms_dcts_list = json.loads(b64decode(atoms))
     atoms_list = [dict2atoms(atoms_dct, plain_arrays=True) for atoms_dct in atoms_dcts_list]
     res = box.insert(auth_token='', atoms=atoms_list)
-    print '220:' + b64encode(json.dumps(res.__dict__))
+    print('220:' + b64encode(json.dumps(res.__dict__)))
 
 
 @error_handler
@@ -70,7 +72,7 @@ def backendUpdate(database, user, atoms, upsert, replace):
     atoms_list = [dict2atoms(atoms_dct, plain_arrays=True) for atoms_dct in atoms_dcts_list]
     res = box.update(auth_token='', atoms=atoms_list,
                     upsert=upsert, replace=replace)
-    print '221:' + b64encode(json.dumps(res.__dict__))
+    print('221:' + b64encode(json.dumps(res.__dict__)))
 
 
 @error_handler
@@ -79,7 +81,7 @@ def backendRemove(database, user, filter, just_one):
     query = json.loads(b64decode(filter))
     res = box.remove(auth_token='', filter=query,
                     just_one=just_one)
-    print '222:' + b64encode(json.dumps(res.__dict__))
+    print('222:' + b64encode(json.dumps(res.__dict__)))
 
 
 @error_handler
@@ -91,16 +93,16 @@ def backendFind(database, user, filter, sort, limit, keys, omit_keys):
                         keys=json.loads(b64decode(keys)),
                         omit_keys=json.loads(b64decode(omit_keys)))
     atoms_dcts_list = [atoms2dict(atoms, True) for atoms in atoms_it]
-    print '204:' + b64encode(json.dumps(atoms_dcts_list))
+    print('204:' + b64encode(json.dumps(atoms_dcts_list)))
 
 
 @error_handler
 def backendAddKeys(database, user, filter, kvp):
     box = StructureBox(Backend(database=database, user=user))
-    res = box.add_keys(auth_token='', 
+    res = box.add_keys(auth_token='',
                        filter=json.loads(b64decode(filter)),
                         kvp=json.loads(b64decode(kvp)))
-    print '223:' + b64encode(json.dumps(res.__dict__))
+    print('223:' + b64encode(json.dumps(res.__dict__)))
 
 
 @error_handler
@@ -109,7 +111,7 @@ def backendRemoveKeys(database, user, filter, keys):
     res = box.remove_keys(auth_token='',
                           filter=json.loads(b64decode(filter)),
                             keys=json.loads(b64decode(keys)))
-    print '224:' + b64encode(json.dumps(res.__dict__))
+    print('224:' + b64encode(json.dumps(res.__dict__)))
 
 
 def main():
@@ -118,17 +120,17 @@ def main():
     try:
         user = sys.argv[1]
     except:
-        print 'No user specified'
+        print('No user specified')
         return
 
     # Read from stdin
     arguments = []
     lines = sys.stdin.readlines()
     if not lines:
-        print '400:' + b64encode('No stdin received')
+        print('400:' + b64encode('No stdin received'))
         sys.exit()
     elif len(lines) > 1:
-        print '400:' + b64encode('Multiple lines in stdin detected')
+        print('400:' + b64encode('Multiple lines in stdin detected'))
         sys.exit()
     else:
         arguments = lines[0].split(' ')
@@ -193,9 +195,9 @@ def main():
 
     elif args.subparser_name == 'remove':
         backendRemove(args.database, user, args.filter, args.just_one)
-        
+
     elif args.subparser_name == 'find':
-        backendFind(args.database, user, args.filter, args.sort, 
+        backendFind(args.database, user, args.filter, args.sort,
                     args.limit, args.keys, args.omit_keys)
 
     elif args.subparser_name == 'add-keys':

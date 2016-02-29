@@ -1,8 +1,10 @@
+
 from __future__ import print_function
+
 import argparse
 import getpass
 import os
-import StringIO
+import io
 import sys
 import tarfile
 import time
@@ -11,14 +13,14 @@ from ase.atoms import Atoms
 from ase.db.core import convert_str_to_float_or_str
 from ase.io import read as ase_read
 from ase.io import write as ase_write
-from authentication import Credentials
+from .authentication import Credentials
 from base64 import b64encode, b64decode
-from config import read_config_file, create_config_file, config_file_exists
-from query import translate
+from .config import read_config_file, create_config_file, config_file_exists
+from .query import translate
 from random import randint
-from results import UpdateResult, InsertResult
-from structurebox import StructureBox
-from table import print_keys_table, print_rows, print_long_row
+from .results import UpdateResult, InsertResult
+from .structurebox import StructureBox
+from .table import print_keys_table, print_rows, print_long_row
 
 description = ''
 
@@ -72,7 +74,7 @@ def main():
     add('-v', '--verbose', action='store_true', default=False)
     add('-q', '--quiet', action='store_true', default=False)
     add('--remote', help = 'Specify the remote')
-    add('-l', '--list', action = 'store_true', 
+    add('-l', '--list', action = 'store_true',
         help = 'Lists all the databases you have access to')
     add('-o', '--show', action='store_true', help='Show the database')
     add('-g', '--long', action='store_true', help='Show more informaion about one selected configuration')
@@ -92,13 +94,13 @@ def main():
         help='Remove selected rows.')
     add('-s', '--store', metavar='', nargs='+', help='Store a directory / list of files')
     add('-u', '--update', metavar='', nargs='+', help='Update the databse with a directory / list of files')
-    add('--replace', action='store_true', default=False, 
+    add('--replace', action='store_true', default=False,
         help='Replace configurations with the same uid when using --update')
-    add('--no-replace', action='store_false', dest='replace', 
+    add('--no-replace', action='store_false', dest='replace',
         help='Don\'t replace configurations with the same uid when using --update')
-    add('--upsert', action='store_true', default=False, 
+    add('--upsert', action='store_true', default=False,
         help='Insert configurations which are not yet in the database when using --update')
-    add('--no-upsert', action='store_false', dest='upsert', 
+    add('--no-upsert', action='store_false', dest='upsert',
         help='Don\'t insert configurations which are not yet in the database when using --update')
     add('-x', '--extract-original-files', action='store_true',
         help='Extract original files stored with --store')
@@ -325,7 +327,11 @@ def run(args, sys_args, verbosity):
 
     # Get the username and password
     if args.user == []:
-        user = raw_input('User: ')
+        try:
+            # PY2 compat
+            user = raw_input('User: ')
+        except NameError:
+            user = input('User: ')
     else:
         user = args.user
 
@@ -377,9 +383,9 @@ def run(args, sys_args, verbosity):
             keys = ['original_files']
             omit = True
 
-        for atoms in box.find(auth_token=token, filter=query, 
-                            sort=sort, limit=args.limit, 
-                            keys=keys, omit_keys=omit):
+        for atoms in box.find(auth_token=token, filter=query,
+                              sort=sort, limit=args.limit,
+                              keys=keys, omit_keys=omit):
             list_of_atoms.append(atoms)
             nrows += 1
 
@@ -393,14 +399,14 @@ def run(args, sys_args, verbosity):
             one_file = False
 
         def add_atoms_to_tar(tar, atoms, name, format):
-            # For some reason tarring oesn't work
+            # For some reason tarring doesn't work
             # if temp_s is used directly in the
-            # tar.addfile function. For this reason 
+            # tar.addfile function. For this reason
             # the contents of temp_s are transferred
             # to s.
-            temp_s = StringIO.StringIO()
+            temp_s = io.StringIO()
             ase_write(temp_s, atoms, format=format)
-            s = StringIO.StringIO(temp_s.getvalue())
+            s = io.StringIO(temp_s.getvalue())
             temp_s.close()
 
             info = tarfile.TarInfo(name=name)
@@ -428,7 +434,7 @@ def run(args, sys_args, verbosity):
         out('  Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
 
     # Extract original file(s) from the database and write them
-    # to the directory specified by the --path-prefix argument 
+    # to the directory specified by the --path-prefix argument
     # (current directory by default), or print the file
     # to stdout.
     elif args.extract_original_files:
@@ -438,7 +444,7 @@ def run(args, sys_args, verbosity):
         original_files =[]
         skipped_configs = []
         nat = 0
-        for atoms in box.find(auth_token=token, filter=query, 
+        for atoms in box.find(auth_token=token, filter=query,
                         sort=sort, limit=args.limit,
                         keys=['original_files', 'uid']):
             nat += 1
@@ -536,7 +542,7 @@ def run(args, sys_args, verbosity):
         def create_tarball(aux_files, atoms, atoms_fname, short_fnames=False):
             '''If short_fnames is True, only last portion of the filename is used.
                 Returns b64encoded tarball (or an empty string)'''
-            c = StringIO.StringIO()
+            c = io.StringIO()
             tar = tarfile.open(fileobj=c, mode='w')
 
             # Add auxilary files
@@ -574,7 +580,7 @@ def run(args, sys_args, verbosity):
                         ats.info['original_files'] = tar
                     atoms_to_store.append(ats)
 
-            for subdir_name, subdir in tree['subdirs'].iteritems():
+            for subdir_name, subdir in tree['subdirs'].items():
                 walk(subdir, atoms_to_store, aux + tree['auxilary'])
 
         # Files were specified on the command line
@@ -667,8 +673,8 @@ def run(args, sys_args, verbosity):
             lim = 0
         else:
             lim = args.limit + 1
-        atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, limit=lim, keys=keys, 
+        atoms_it = box.find(auth_token=token, filter=query,
+                            sort=sort, limit=lim, keys=keys,
                             omit_keys=omit_keys)
         count = atoms_it.count()
         if args.limit != 0 and count > args.limit:
@@ -678,8 +684,8 @@ def run(args, sys_args, verbosity):
         print('Found:', count)
 
     elif args.ids:
-        atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, limit=args.limit, 
+        atoms_it = box.find(auth_token=token, filter=query,
+                            sort=sort, limit=args.limit,
                             keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
             uid = atoms.info.get('uid')
@@ -687,15 +693,15 @@ def run(args, sys_args, verbosity):
 
     # Show the database
     elif args.show:
-        atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, limit=args.limit, 
+        atoms_it = box.find(auth_token=token, filter=query,
+                            sort=sort, limit=args.limit,
                             keys=keys, omit_keys=omit_keys)
-        print_rows(atoms_it, border=args.pretty, 
+        print_rows(atoms_it, border=args.pretty,
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
 
     elif args.long:
-        atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, limit=args.limit, 
+        atoms_it = box.find(auth_token=token, filter=query,
+                            sort=sort, limit=args.limit,
                             keys=keys, omit_keys=omit_keys)
         try:
             atoms = next(atoms_it)
@@ -722,8 +728,8 @@ def run(args, sys_args, verbosity):
 
     # Print info about keys
     else:
-        atoms_it = box.find(auth_token=token, filter=query, 
-                            sort=sort, limit=args.limit, keys=keys, 
+        atoms_it = box.find(auth_token=token, filter=query,
+                            sort=sort, limit=args.limit, keys=keys,
                             omit_keys=omit_keys)
-        print_keys_table(atoms_it, border=args.pretty, 
+        print_keys_table(atoms_it, border=args.pretty,
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)

@@ -17,11 +17,11 @@ from ase.calculators.singlepoint import SinglePointCalculator
 from ase.db import connect
 from ase.utils import plural
 from base64 import b64encode
-from itertools import imap
-from mongodb2asedb import translate_query
+
+from .mongodb2asedb import translate_query
 from random import randint
-from remote import communicate_with_remote
-from util import get_dbs_path, reserved_usernames
+from .remote import communicate_with_remote
+from .util import get_dbs_path, reserved_usernames
 
 
 def row2atoms(row, keys, omit_keys):
@@ -37,7 +37,7 @@ def row2atoms(row, keys, omit_keys):
 
     data = row.get('data')
     if data:
-        for (key, value) in data.items():
+        for (key, value) in list(data.items()):
             key = str(key) # avoid unicode strings
             value = np.array(value)
             if value.dtype.kind == 'U':
@@ -50,8 +50,8 @@ def row2atoms(row, keys, omit_keys):
     # unique_id is added automatically by ASEdb, we don't need it
     atoms.info.pop('unique_id', None)
 
-    filtered_keys = filter_keys(atoms.info.keys(), keys, omit_keys)
-    atoms.info = {k: v for k, v in atoms.info.iteritems() if k in filtered_keys}
+    filtered_keys = filter_keys(list(atoms.info.keys()), keys, omit_keys)
+    atoms.info = {k: v for k, v in atoms.info.items() if k in filtered_keys}
     return atoms
 
 
@@ -61,8 +61,8 @@ class ASEdbSQlite3Backend(Backend):
         def __init__(self, iterator):
             self.iterator = iterator
 
-        def next(self):
-            return self.iterator.next()
+        def __next__(self):
+            return next(self.iterator)
 
         def count(self):
             n = 0
@@ -71,7 +71,7 @@ class ASEdbSQlite3Backend(Backend):
             return n
 
     def require_database(func):
-        '''When a function is decorated with this, an error will be thrown if 
+        '''When a function is decorated with this, an error will be thrown if
             the connection to a database is not open.'''
         def func_wrapper(*args, **kwargs):
             if args[0].connection is None:
@@ -138,7 +138,7 @@ class ASEdbSQlite3Backend(Backend):
         else:
             # This backend does not support multicolumn sorting.
             # Only sort by first column.
-            sort, direction = sort.iteritems().next()
+            sort, direction = next(iter(sort.items()))
             if direction == abcd.Direction.ASCENDING:
                 reverse = False
             else:
@@ -181,7 +181,7 @@ class ASEdbSQlite3Backend(Backend):
     def connect_to_database(self):
         '''
         Connnects to a database with given name. If it doesn't
-        exist, a new one is created. The method first looks in the 
+        exist, a new one is created. The method first looks in the
         "write" folder, and then in the "readonly" folder
         '''
 
@@ -353,7 +353,7 @@ class ASEdbSQlite3Backend(Backend):
             if 'arrays' in d1 and 'arrays' in d2:
                 d1['arrays'].update(d2['arrays'])
             # Update the rest
-            for k, v in d2.iteritems():
+            for k, v in d2.items():
                 if k == 'info' or k == 'arrays':
                     continue
                 if k not in d1:
@@ -418,7 +418,7 @@ class ASEdbSQlite3Backend(Backend):
                     replaced_ids.append(ins_uid)
 
         msg = 'Updated {}/{} configurations.'.format(len(updated_ids), n_atoms)
-        return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids, 
+        return results.UpdateResult(updated_ids=updated_ids, skipped_ids=skipped_ids,
                                     upserted_ids=upserted_ids, replaced_ids=replaced_ids, msg=msg)
 
     @require_database
@@ -460,14 +460,14 @@ class ASEdbSQlite3Backend(Backend):
         rows_iter = self._select(filter, sort=sort, limit=limit)
 
         # Convert it to the Atoms iterator.
-        return ASEdbSQlite3Backend.Cursor(imap(lambda x: row2atoms(x, keys, omit_keys), rows_iter))
+        return ASEdbSQlite3Backend.Cursor(map(lambda x: row2atoms(x, keys, omit_keys), rows_iter))
 
     @require_database
     @read_only
     def add_keys(self, auth_token, filter, kvp):
 
         if self.remote:
-            cmd = 'add-keys {} {} {}'.format(self.database, b64encode(json.dumps(filter)), 
+            cmd = 'add-keys {} {} {}'.format(self.database, b64encode(json.dumps(filter)),
                     b64encode(json.dumps(kvp)))
             return communicate_with_remote(self.remote, cmd)
 
@@ -479,9 +479,9 @@ class ASEdbSQlite3Backend(Backend):
     @require_database
     @read_only
     def remove_keys(self, auth_token, filter, keys):
-        
+
         if self.remote:
-            cmd = 'remove-keys {} {} {}'.format(self.database, b64encode(json.dumps(filter)), 
+            cmd = 'remove-keys {} {} {}'.format(self.database, b64encode(json.dumps(filter)),
                     b64encode(json.dumps(keys)))
             return communicate_with_remote(self.remote, cmd)
 

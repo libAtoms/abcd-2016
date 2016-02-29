@@ -1,10 +1,12 @@
-__author__ = 'Patrick Szmucer'
+from __future__ import print_function
 
 import collections
 import numpy as np
 import time
 from prettytable import PrettyTable
-from util import atoms2dict, filter_keys
+from .util import atoms2dict, filter_keys
+
+__author__ = 'Patrick Szmucer'
 
 
 def trim(val, length):
@@ -22,10 +24,10 @@ def atoms_list2dict(atoms_it):
     for atoms in atoms_it:
         dct = atoms2dict(atoms, plain_arrays=True)
         if 'info' in dct and dct['info']:
-            for key, value in dct['info'].iteritems():
+            for key, value in dct['info'].items():
                 dct[key] = dct['info'][key]
         if 'arrays' in dct and dct['arrays']:
-            for key, value in dct['arrays'].iteritems():
+            for key, value in dct['arrays'].items():
                 dct[key] = dct['arrays'][key]
         dct.pop('info', None)
         dct.pop('arrays', None)
@@ -56,7 +58,7 @@ def print_kvps(kvps):
     try:
         max_k = max(len(t[0]) for t in kvps)
     except ValueError:
-        print '  -\n'
+        print('  -\n')
         return
 
     s = ''
@@ -67,7 +69,7 @@ def print_kvps(kvps):
         s += ':  '
         s += str(format_value(t[1], t[0]))
         s += '\n'
-    print s
+    print(s)
 
 
 def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
@@ -75,7 +77,7 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
 
     dicts = atoms_list2dict(atoms_list)
     if not dicts:
-        print '  Nothing to display'
+        print('  Nothing to display')
         return
 
     keys = set()
@@ -96,7 +98,7 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
                 keys_list.insert(0, keys_list.pop(keys_list.index(key)))
 
     if not keys_list:
-        print '  No keys to display'
+        print('  No keys to display')
         return
 
     if truncate:
@@ -119,7 +121,7 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
         t.border = False
         t.align = 'l'
 
-    # Apply special size rules to some keys    
+    # Apply special size rules to some keys
     cell_sizes = {}
     for key in keys_list:
         if not truncate:
@@ -152,16 +154,16 @@ def print_rows(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[
     if no_rows > 0:
         s += comment + t.get_string() + '\n'
     s += comment + '  Rows: {}'.format(no_rows)
-    print s
+    print(s)
 
 
 def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_keys=[]):
-    '''Prints two tables: Intersection table and Union table, and shows min and max values 
+    '''Prints two tables: Intersection table and Union table, and shows min and max values
         for each key'''
 
     dicts = atoms_list2dict(atoms_list)
     if len(dicts) == 0:
-        print '  Nothing to display'
+        print('  Nothing to display')
         return
 
     union = set()
@@ -233,7 +235,7 @@ def print_keys_table(atoms_list, border=True, truncate=True, show_keys=[], omit_
     s += '\n' + comment + table_string(intersection) + '\n'
     s += '\n' + comment + 'UNION'
     s += '\n' + comment + table_string(union)+ '\n'
-    print s
+    print(s)
 
 
 def print_long_row(atoms):
@@ -244,7 +246,7 @@ def print_long_row(atoms):
     arrays = d['arrays']
 
     # General information about the configuration
-    print ''
+    print('')
     g = []
     g.append(('uid', info.pop('uid', None)))
     g.append(('c_time', info.pop('c_time', None)))
@@ -275,16 +277,16 @@ def print_long_row(atoms):
     print_kvps(g)
 
     # Other main information
-    print 'Other:'
-    g = [(k, v) for k, v in d.iteritems() if k not in ('info', 'arrays')]
+    print('Other:')
+    g = [(k, v) for k, v in d.items() if k not in ('info', 'arrays')]
     print_kvps(g)
 
     # Other kvps from the info array
-    print 'Other (info):'
-    g = [(k, v) for k, v in info.iteritems()]
+    print('Other (info):')
+    g = [(k, v) for k, v in info.items()]
     print_kvps(g)
 
     # Data from the arrays dict
-    print 'Other (arrays):'
-    g = [(k, v) for k, v in arrays.iteritems()]
+    print('Other (arrays):')
+    g = [(k, v) for k, v in arrays.items()]
     print_kvps(g)

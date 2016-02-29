@@ -1,1 +1,1 @@
-from backend import Direction
+from .backend import Direction

@@ -4,10 +4,12 @@ import numpy as np
 from ase.atoms import Atoms
 from ase.calculators.calculator import get_calculator, all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
+from six import string_types
+
 
 def filter_keys(keys_list, keys, omit_keys):
     '''Decides which keys to show given keys and omit_keys'''
-    
+
     new_keys_list = list(keys_list)
     if omit_keys:
         if keys is not None:
@@ -32,10 +34,11 @@ def get_info_and_arrays(atoms, plain_arrays):
     """
     info = {}
     arrays = {}
-    for (key, value) in atoms.info.items():
+    for (key, value) in list(atoms.info.items()):
         key = key.lower()
-        if (isinstance(value, int) or isinstance(value, basestring) or
-                isinstance(value, float) or isinstance(value, bool)):
+        # TODO: all scalar values? test...
+        if (isinstance(value, int) or isinstance(value, string_types) or
+            isinstance(value, float) or isinstance(value, bool)):
             # Scalars
             info[key] = value
         else:
@@ -43,14 +46,14 @@ def get_info_and_arrays(atoms, plain_arrays):
             arrays[key] = value
 
     skip_arrays = ['numbers', 'positions', 'species']
-    for (key, value) in atoms.arrays.iteritems():
+    for (key, value) in atoms.arrays.items():
         if key in skip_arrays:
             continue
         key = key.lower()
         arrays[key] = value
 
     if plain_arrays:
-        for key, value in arrays.iteritems():
+        for key, value in arrays.items():
             if value.__class__ == np.ndarray:
                 arrays[key] = value.tolist()
 
@@ -86,7 +89,7 @@ def atoms2dict(atoms, plain_arrays=False):
             d.update(atoms.calc.results)
 
     if plain_arrays:
-        for key, value in d.iteritems():
+        for key, value in d.items():
             if value.__class__ == np.ndarray:
                 d[key] = value.tolist()
 
@@ -122,7 +125,7 @@ def dict2atoms(d, plain_arrays=False):
     atoms.info['uid'] = d.get('uid')
 
     if 'arrays' in d:
-        for key, value in d['arrays'].iteritems():
+        for key, value in d['arrays'].items():
             key = str(key)  # avoid unicode strings
             if plain_arrays:
                 value = np.array(value)
@@ -133,6 +136,6 @@ def dict2atoms(d, plain_arrays=False):
             except (TypeError, ValueError):
                 atoms.info[key] = value
     if 'info' in d:
-        for key, value in d['info'].iteritems():
+        for key, value in d['info'].items():
             atoms.info[str(key)] = value
     return atoms

@@ -48,8 +48,8 @@ def translate_query(query):
 
     asedb_queries = []
     for single_query in query['$and']:
-        for key, dct in single_query.iteritems():
-            for op, val in dct.iteritems():
+        for key, dct in single_query.items():
+            for op, val in dct.items():
                  asedb_queries.append(interpret(key, op, val))
 
     # Because ASEdb doesn't understand ORs, we need to split up

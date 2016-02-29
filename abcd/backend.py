@@ -12,6 +12,8 @@ __author__ = 'Martin Uhrin, Patrick Szmucer'
 from abc import ABCMeta
 from abc import abstractmethod
 
+from six import add_metaclass
+
 
 def enum(*sequential):
     enums = dict(zip(sequential, range(len(sequential))))
@@ -20,9 +22,9 @@ def enum(*sequential):
 Direction = enum('ASCENDING', 'DESCENDING')
 
 
+# PY2 compat
+@add_metaclass(ABCMeta)
 class Backend(object):
-    __metaclass__ = ABCMeta
-
     @abstractmethod
     def list(self, auth_token):
         """
@@ -55,7 +57,7 @@ class Backend(object):
         :param AuthToken auth_token: Authorisation token
         :param atoms: Atoms to insert
         :type atoms: Atoms or Atoms iterable
-        :return: Returns a result that holds a list of ids at which 
+        :return: Returns a result that holds a list of ids at which
             the objects were inserted and a message
         :rtype: InsertResult
         """
@@ -65,7 +67,7 @@ class Backend(object):
     def update(self, auth_token, atoms, upsert, replace):
         """
         Take the atoms object and find an entry in the database with
-        the same unique id. If one exists, the old entry gets updated 
+        the same unique id. If one exists, the old entry gets updated
         with the new entry.
 
         :param AuthToken auth_token: Authorisation token
@@ -152,9 +154,9 @@ class Backend(object):
         pass
 
 
+# PY2 compat
+@add_metaclass(ABCMeta)
 class Cursor(object):
-    __metaclass__ = ABCMeta
-
     def __iter__(self):
         return self
 

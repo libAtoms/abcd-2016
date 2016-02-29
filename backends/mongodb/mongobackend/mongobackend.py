@@ -19,7 +19,7 @@ import abcd.util as util
 class MongoDBBackend(Backend):
     class Transform(SONManipulator):
         def transform_incoming(self, son, collection):
-            for (key, value) in son.items():
+            for key, value in son.items():
                 if isinstance(value, np.ndarray):
                     son[key] = {"_type": "nparray", "value": value.tolist()}
                 elif isinstance(value, dict):  # Make sure we recurse into sub-docs
@@ -27,7 +27,7 @@ class MongoDBBackend(Backend):
             return son
 
         def transform_outgoing(self, son, collection):
-            for (key, value) in son.items():
+            for key, value in son.items():
                 if isinstance(value, dict):
                     if "_type" in value and value["_type"] == "nparray":
                         son[key] = np.array(value["value"])
@@ -39,8 +39,8 @@ class MongoDBBackend(Backend):
         def __init__(self, pymongo_cursor):
             self.pymongo_cursor = pymongo_cursor
 
-        def next(self):
-            return ase.db.row.AtomsRow(self.pymongo_cursor.next()).toatoms()
+        def __next__(self):
+            return ase.db.row.AtomsRow(next(self.pymongo_cursor)).toatoms()
 
         def count(self):
             return self.pymongo_cursor.count()

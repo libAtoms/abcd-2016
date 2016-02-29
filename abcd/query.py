@@ -102,7 +102,7 @@ def interpret(query):
 
 def update(d1, d2):
     """Update dictionary d1 with d2"""
-    for k, v in d2.iteritems():
+    for k, v in d2.items():
         if k in d1:
             for op in d2[k].keys():
                 if op in d1[k]:
