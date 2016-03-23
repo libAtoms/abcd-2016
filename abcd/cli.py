@@ -161,7 +161,7 @@ def untar_file(fileobj, path_prefix):
 def untar_and_delete(tar_files, path_prefix):
     # Untar individual tarballs
     for tarball in tar_files:
-        with open(tarball, 'r') as f:
+        with open(tarball, 'rb') as f:
             untar_file(f, path_prefix)
         os.remove(tarball)
 
@@ -491,7 +491,7 @@ def run(args, sys_args, verbosity):
             elif os.path.exists(path):
                 out('{} already exists. Skipping write'.format(path))
 
-            with open(path, 'w') as original_file:
+            with open(path, 'wb') as original_file:
                 original_file.write(b64decode(original_files[i]))
                 extracted_paths.append(path)
 
@@ -542,7 +542,7 @@ def run(args, sys_args, verbosity):
         def create_tarball(aux_files, atoms, atoms_fname, short_fnames=False):
             '''If short_fnames is True, only last portion of the filename is used.
                 Returns b64encoded tarball (or an empty string)'''
-            c = io.StringIO()
+            c = io.BytesIO()
             tar = tarfile.open(fileobj=c, mode='w')
 
             # Add auxilary files
@@ -577,7 +577,7 @@ def run(args, sys_args, verbosity):
                 # atoms_to_store.
                 for ats in atoms:
                     if tar:
-                        ats.info['original_files'] = tar
+                        ats.info['original_files'] = str(tar)
                     atoms_to_store.append(ats)
 
             for subdir_name, subdir in tree['subdirs'].items():
@@ -594,7 +594,7 @@ def run(args, sys_args, verbosity):
 
                 for ats in atoms:
                     if tar:
-                        ats.info['original_files'] = tar
+                        ats.info['original_files'] = str(tar)
                     atoms_to_store.append(ats)
 
         # At least one directory was specified on the command line.
