@@ -14,6 +14,7 @@ def test_abc_backend():
         b = backend.Backend()
     assert "Can't instantiate abstract class" in str(excinfo.value)
 
+
 def test_abc_cursor():
     """Can't instance ABC."""
     with pytest.raises(TypeError) as excinfo:
@@ -24,7 +25,7 @@ def test_abc_cursor():
 def test_backend_implemented():
     """Can instance once all methods are implemented."""
     class Implemented(backend.Backend):
-        def add_keys():
+        def add_keys(self, *args, **kwargs):
             pass
 
         def authenticate(self, *args, **kwargs):
