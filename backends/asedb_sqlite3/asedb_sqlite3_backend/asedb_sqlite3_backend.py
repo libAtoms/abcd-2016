@@ -59,9 +59,12 @@ class ASEdbSQlite3Backend(Backend):
 
     class Cursor(abcd.backend.Cursor):
         def __init__(self, iterator):
-            self.iterator = iterator
+            self.iterator = iter(iterator)
 
         def __next__(self):
+            return next(self.iterator)
+
+        def next(self):
             return next(self.iterator)
 
         def count(self):
