@@ -1,5 +1,42 @@
 # ABCD
-**ABCD** (**A**tom-**B**ased **C**onfiguration **D**atabase) was designed to work with any backend that conforms to the specification. To use ABCD, two main steps have to be berformed:
+
+[![Build Status](https://travis-ci.org/libAtoms/abcd.svg?branch=master)](https://travis-ci.org/libAtoms/abcd)
+
+**ABCD** is the **A**tom-**B**ased **C**onfiguration **D**atabase. Designed to
+store atomistic data with an interface that makes it easy to work with 
+and share your data.
+ 
+```shell
+% abcd tungsten --store *.xyz
+35 configurations were inserted:
+  42049fa6f48a2e1
+  ebce002d9192f15
+  6cf54ac7b5a6be2
+  7b757bbe194668c
+  849d45805f494c0
+  ...
+
+% abcd tungsten.db --show --limit 5
+
++---------------+-------------+-------+-------+-------+-----------+---+----------+----------+----------+----------+
+|      uid      |    c_time   |formula|n_atoms|numbers|config_type|pbc|positions |   cell   |  energy  |  virial  |
++---------------+-------------+-------+-------+-------+-----------+---+----------+----------+----------+----------+
+|42049fa6f48a2e1|23Mar16 17:02|   W   |   1   |  [74] | slice_sa..|TTT|[[0.0, 0..|[[3.1686..|-11.1598..|[[0.1510..|
+|ebce002d9192f15|23Mar16 17:02|   W   |   1   |  [74] | slice_sa..|TTT|[[0.0, 0..|[[2.7685..|-11.0424..|[[1.4659..|
+|6cf54ac7b5a6be2|23Mar16 17:02|   W   |   1   |  [74] | slice_sa..|TTT|[[0.0, 0..|[[2.7688..|-11.0080..|[[-0.611..|
+|7b757bbe194668c|23Mar16 17:02|   W   |   1   |  [74] | slice_sa..|TTT|[[0.0, 0..|[[3.2516..|-11.1097..|[[-0.503..|
+|849d45805f494c0|23Mar16 17:02|   W   |   1   |  [74] | slice_sa..|TTT|[[0.0, 0..|[[2.9675..|-11.0596..|[[3.5954..|
++---------------+-------------+-------+-------+-------+-----------+---+----------+----------+----------+----------+
+  Rows: 5
+
+% abcd tungsten.db 'energy>-11.1' 'energy<-11.0' --write-to-file out.xyz
+  Writing 1 file(s) to ./
+```
+
+ABCD works with several database backends (ase, mongodb) and can be
+extended to any others using a simple specification.
+
+To use ABCD, two main steps have to be performed:
 
 - *abcd* installation
 - backend installation
