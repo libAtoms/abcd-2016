@@ -1,18 +1,21 @@
 """
-The backend interface that must be implemented by any structure storage library
-that wants to be compliant with this framework.
+Backend Specification
+
+The backend interface that must be implemented by any structure storage
+library to be compliant with this framework.
 
 In general implementations of this class should perform translation from to
 commands understood by the native storage format being used be it SQL,
 a filesystem, MongoDB or others.
 """
 
-__author__ = 'Martin Uhrin, Patrick Szmucer'
-
 from abc import ABCMeta
 from abc import abstractmethod
 
 from six import add_metaclass
+
+
+__author__ = 'Martin Uhrin, Patrick Szmucer'
 
 
 def enum(*sequential):

@@ -29,6 +29,6 @@ setup(
     entry_points={
         'console_scripts': [
             'abcd = abcd.cli:main',
-        ],
+            'abcd_modular = abcd.cli_modular:main', ],
     }
 )
