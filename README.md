@@ -1,6 +1,9 @@
 # ABCD
 
-[![Build Status](https://travis-ci.org/libAtoms/abcd.svg?branch=master)](https://travis-ci.org/libAtoms/abcd)
+*Build info* [![Build Status](https://travis-ci.org/libAtoms/abcd.svg?branch=master)](https://travis-ci.org/libAtoms/abcd)
+
+*Docs* [![Documentation Status](https://readthedocs.org/projects/abcd/badge/?version=latest)](http://abcd.readthedocs.org/en/latest/?badge=latest)
+
 
 **ABCD** is the **A**tom-**B**ased **C**onfiguration **D**atabase. Designed to
 store atomistic data with an interface that makes it easy to work with 
@@ -29,12 +32,12 @@ and share your data.
 +---------------+-------------+-------+-------+-------+-----------+---+----------+----------+----------+----------+
   Rows: 5
 
-% abcd tungsten.db 'energy>-11.1' 'energy<-11.0' --write-to-file out.xyz
-  Writing 1 file(s) to ./
+% abcd tungsten.db 'energy<-11.1' 'config_type=slice_sample' --write-to-file out_%i.xyz
+  Writing 12 file(s) to ./
 ```
 
-ABCD works with several database backends (ase, mongodb) and can be
-extended to any others using a simple specification.
+ABCD works with several database backends (ase, mongodb) and can be extended 
+to any others using a simple specification.
 
 To use ABCD, two main steps have to be performed:
 

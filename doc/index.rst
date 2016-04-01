@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to abcd's documentation!
-================================
+ABCD - The atom based configuration database
+============================================
 
 Contents:
 
@@ -12,8 +12,8 @@ Contents:
    :maxdepth: 2
 
    introduction
-   DESIGN
-   TODO
+   design
+   todo
 
 API Documentation
 =================
