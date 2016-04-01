@@ -17,6 +17,7 @@
 
 * Convert CLI into a Python class that can be interacted with using Python.
   CLI subcommands become methods.
+* Relicense as LGPL?
 
 ## asedb-based backend
 

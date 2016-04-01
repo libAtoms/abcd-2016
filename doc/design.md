@@ -16,6 +16,7 @@ Provide the following:
 Language and framework:
 
   * Written in pure Python;
+  * Works flawlessly with Python 2.7 and 3.3 upwards;
   * Depends on ASE for working with `Atoms` objects.
 
 Backends:

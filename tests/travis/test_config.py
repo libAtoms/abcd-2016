@@ -8,10 +8,7 @@ import os
 
 import pytest
 
-from abcd.config import config_file_exists, create_config_file
-from abcd.config import read_config_file
-
-CONFIG_PATH = os.path.join(os.environ['HOME'], '.abcd_config')
+from abcd.config import ConfigFile
 
 # Important! This skips all tests in the module!
 pytestmark = pytest.mark.skipif(os.getenv('TRAVIS') != 'true',
@@ -19,37 +16,45 @@ pytestmark = pytest.mark.skipif(os.getenv('TRAVIS') != 'true',
 
 
 def test_exists():
-    # Need to delete the config file since abcd likes to recreate it
-    try:
-        os.remove(CONFIG_PATH)
-    except:
-        pass
-    assert config_file_exists() == False
-    config_file = open(CONFIG_PATH, 'w')
-    config_file.close()
-    assert config_file_exists() == True
-    os.remove(CONFIG_PATH)
+    config_file = ConfigFile('test')
+    config_file.delete()
+    assert config_file.exists() == False
+    config_test = open(config_file.path, 'w')
+    config_test.close()
+    assert config_file.exists() == True
+    config_file.delete()
+
+
+def test_create_config_empty():
+    config_file = ConfigFile('test')
+    config_file.delete()
+    assert config_file.exists() == False
+    config_file.initialise()
+    assert config_file.exists() == True
+    config_file.delete()
 
 
 def test_create_config():
-    try:
-        os.remove(CONFIG_PATH)
-    except:
-        pass
-    assert config_file_exists() == False
-    create_config_file()
-    assert config_file_exists() == True
-    os.remove(CONFIG_PATH)
+    config_file = ConfigFile('test')
+    config_file.delete()
+    assert config_file.exists() == False
+    config_file.initialise({'test_section': {'test_option': 'test_value'}})
+    assert config_file.exists() == True
+    assert config_file.has_section('test_section')
+    assert config_file.has_option('test_section', 'test_option')
+    assert config_file.get('test_section', 'test_option') == 'test_value'
+    config_file.delete()
 
 
 def test_read_config():
-    try:
-        os.remove(CONFIG_PATH)
-    except:
-        pass
-    no_config = read_config_file()
-    assert no_config.has_section('abcd') == False
-    create_config_file()
-    with_config = read_config_file()
-    assert with_config.has_section('abcd') == True
-    os.remove(CONFIG_PATH)
+    config_file = ConfigFile('test')
+    config_file.delete()
+    assert config_file.exists() == False
+    config_file.initialise({'test_section': {'test_option': 'test_value'}})
+    assert config_file.exists() == True
+    # re-read the file
+    config_file = ConfigFile('test')
+    assert config_file.has_section('test_section')
+    assert config_file.has_option('test_section', 'test_option')
+    assert config_file.get('test_section', 'test_option') == 'test_value'
+    config_file.delete()

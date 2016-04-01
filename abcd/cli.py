@@ -5,6 +5,7 @@ import argparse
 import getpass
 import os
 import io
+import shlex
 import sys
 import tarfile
 import time
@@ -15,7 +16,7 @@ from ase.io import read as ase_read
 from ase.io import write as ase_write
 from .authentication import Credentials
 from base64 import b64encode, b64decode
-from .config import read_config_file, create_config_file, config_file_exists
+from .config import ConfigFile
 from .query import translate
 from random import randint
 from .results import UpdateResult, InsertResult
@@ -43,18 +44,22 @@ def main():
     if isinstance(sys_args, str):
         sys_args = sys_args.split(' ')
 
-    if not config_file_exists():
-        create_config_file()
+    config_file = ConfigFile('cli')
+
+    if not config_file.exists():
+        defaults = {'abcd': {
+            'opts': '',
+            'backend_module': '',
+            'backend_name': ''}}
+        config_file.initialise(defaults)
 
     # Load the options from the config file. Push them to the front of the list
     # so they will be overwritten on the command line.
-    cfg_options = read_config_file().get('abcd', 'opts')
-    new_args = []
-    if (cfg_options[0] == cfg_options[-1]) and cfg_options.startswith(("'", '"')):
-        cfg_options = cfg_options[1:-1]
-    for opt in cfg_options.split(' '):
-        if opt:
-            new_args.append(opt)
+    cfg_options = config_file.get('abcd', 'opts')
+    # parse string as commadline options
+    new_args = shlex.split(cfg_options)
+    # Stick them at the front
+    # TODO: will not work with subcommands
     sys_args = new_args + sys_args
 
     parser = argparse.ArgumentParser(usage = 'abcd [db-name] [selection] [options]',
@@ -310,13 +315,13 @@ def run(args, sys_args, verbosity):
     #
     #
     # Backend initialisation and authentication
-    cfg = read_config_file()
+    cfg = ConfigFile('cli')
     backend_module = cfg.get('abcd', 'backend_module')
     backend_name = cfg.get('abcd', 'backend_name')
 
     # Quit if no backend was specified
     if not backend_module or not backend_name:
-        print('  Please specify the backend in ~/.abcd_config')
+        print('  Please specify the backend in {}'.format(cfg.path))
         sys.exit()
 
     # Import the backend
