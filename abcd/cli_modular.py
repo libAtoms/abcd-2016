@@ -101,12 +101,16 @@ def main():
 
     # Query options
 
+    # Credentials
+    p_credentials = argparse.ArgumentParser(add_help=False)
+    p_credentials.add_argument('-u', '--user', nargs='?', const='',
+                               help="Username used to log in to a database.")
 
     # Each command enacts a different action that will correspond to a method
     # of Abcd.
     subparsers = parser.add_subparsers(title="Commands", dest='command')
 
-    p_store = subparsers.add_parser("store", parents=[p_verbosity],
+    p_store = subparsers.add_parser("store", parents=[p_verbosity, p_credentials],
                                     help="Store new configurations in the "
                                          "database.")
     p_store.add_argument('filename', nargs='+',
@@ -118,8 +122,8 @@ def main():
 
     p_extract = subparsers.add_parser("extract")
 
-
-    print(parser.parse_args())
+    # TODO: switch to new argument system
+    #print(parser.parse_args())
 
     parser = argparse.ArgumentParser(usage = 'abcd [db-name] [selection] [options]',
                         description = description,
@@ -324,13 +328,92 @@ def print_result(result, multiconfig_files, database):
             print('  ', f)
 
 class Abcd(object):
-    """API interaction with added extras."""
-    def __init__(self, database, *args, **kwargs):
-        # Add all the general options and initialisation here.
-        print(database)
+    """API interface to the functionality of the commandline.
 
-    def remove(self):
-        pass
+    Instance with a database identifier and it will take care of
+    initialisation and provide an easy interface to user friendly methods.
+    For a more low level interface, look at StructureBox.
+    """
+    def __init__(self, database, **kwargs):
+        """
+        Possible kwargs:
+        remote : remote server to use
+        user : username, leave as empty string to ask for username
+        """
+        # Add all the general options and initialisation here.
+
+        # Figure out the database
+        # TODO: multiple plugins and bookmarks; not cfg file
+        # FIXME: No database case
+        if ':' in database:
+            remote, database = database.split(':')
+            if 'remote' in kwargs and kwargs['remote'] is not None and kwargs['remote'] != remote:
+                print('Error: Remote specified twice: "{}" and "{}"'.format(
+                    remote, kwargs['remote']), file=sys.stderr)
+                sys.exit()
+            self.remote = remote
+            self.database = database
+        else:
+            self.database = database
+            self.remote = None
+
+        # Backend initialisation and authentication
+        cfg = ConfigFile('cli')
+        backend_module = cfg.get('abcd', 'backend_module')
+        backend_name = cfg.get('abcd', 'backend_name')
+
+        # Quit if no backend was specified
+        if not backend_module or not backend_name:
+            print('  Please specify the backend in {}'.format(cfg.path))
+            sys.exit()
+
+        # Import the backend
+        Backend = getattr(__import__(backend_module, fromlist=[backend_name]),
+                          backend_name)
+
+        # Initialise the backend
+        # TODO: rename 'box'
+        self.box = StructureBox(Backend(database=self.database,
+                                        remote=self.remote))
+
+        # Get the username and password
+        if 'user' in kwargs and kwargs['user'] == '':
+            try:
+                # PY2 compat
+                self.user = raw_input('User: ')
+            except NameError:
+                self.user = input('User: ')
+        elif 'user' in kwargs:
+            self.user = kwargs['user']
+        else:
+            self.user = None
+
+        if 'password' in kwargs and kwargs['password'] =='':
+            self.password = getpass.getpass()
+        elif 'password' in kwargs:
+            self.password = kwargs['password']
+        else:
+            self.password = None
+
+        # Authenticate
+        self.token = self.box.authenticate(Credentials(self.user))
+        # TODO: actual authentication
+
+        print(self.box)
+
+    def remove(self, query, just_one=False):
+        """Remove entries from the database. """
+        # Remove entries from a database
+        result = self.box.remove(self.token, query, just_one=just_one)
+        return result
+
+    def find(self, filter, sort=None, limit=0, keys=None,
+             omit_keys=False):
+        if sort is None:
+            sort = {}
+        return self.box.find(auth_token=self.token, filter=filter, sort=sort,
+                             limit=limit, keys=keys, omit_keys=omit_keys)
+
 
     def write_to_file(self):
         pass
@@ -341,11 +424,14 @@ class Abcd(object):
     def store(self):
         pass
 
-    def add_keys(self):
-        pass
+    def add_keys(self, filter, kvp):
+        """Add the key=value pairs to the filtered configurations."""
+        result = self.box.add_keys(auth_token=self.token, filter=filter, kvp=kvp)
 
-    def remove_keys(self):
-        pass
+    def remove_keys(self, filter, keys):
+        """Remove keys from filtered configurations."""
+        result = self.box.remove_keys(auth_token=self.token, filter=filter, keys=keys)
+        return result
 
     def count(self):
         pass
@@ -414,51 +500,12 @@ def run(args, sys_args, verbosity):
             remove_keys.append(key)
     remove_keys = [a for a in remove_keys if a not in (None, '', ' ')]
 
-
-    #
-    #
-    # Backend initialisation and authentication
-    cfg = ConfigFile('cli')
-    backend_module = cfg.get('abcd', 'backend_module')
-    backend_name = cfg.get('abcd', 'backend_name')
-
-    # Quit if no backend was specified
-    if not backend_module or not backend_name:
-        print('  Please specify the backend in {}'.format(cfg.path))
-        sys.exit()
-
-    # Import the backend
-    Backend = getattr(__import__(backend_module, fromlist=[backend_name]), backend_name)
-
-    # Initialise the backend
-    box = StructureBox(Backend(database=args.database, remote=args.remote))
-
-    # Get the username and password
-    if args.user == []:
-        try:
-            # PY2 compat
-            user = raw_input('User: ')
-        except NameError:
-            user = input('User: ')
-    else:
-        user = args.user
-
-    if args.password == []:
-        password = getpass.getpass()
-    else:
-        password = args.password
-
-    # Authenticate
-    token = box.authenticate(Credentials(user))
-    #
-    #
-    #
+    my_abcd = Abcd(database=args.database, remote=args.remote,
+                   user=args.user, password=args.password)
 
 
-    # Remove entries from a database
     if args.remove:
-        result = box.remove(token, query, just_one=False)
-        print(result.msg)
+        print(my_abcd.remove(query).msg)
 
     # Extract a configuration from the database and write it
     # to the specified file.
@@ -768,22 +815,23 @@ def run(args, sys_args, verbosity):
         print_result(result, multiconfig_files, args.database)
 
     elif args.add_keys:
-        result = box.add_keys(token, query, kvp)
+        result = my_abcd.add_keys(query, kvp)
         print(result.msg)
 
     elif args.remove_keys:
-        result = box.remove_keys(token, query, remove_keys)
+        result = my_abcd.remove_keys(query, remove_keys)
         print(result.msg)
 
     # Count selected configurations
     elif args.count:
+        # Zero is no limit, but count at least as many as limit
         if args.limit == 0:
             lim = 0
         else:
             lim = args.limit + 1
-        atoms_it = box.find(auth_token=token, filter=query,
-                            sort=sort, limit=lim, keys=keys,
-                            omit_keys=omit_keys)
+        atoms_it = my_abcd.find(filter=query,
+                                sort=sort, limit=lim, keys=keys,
+                                omit_keys=omit_keys)
         count = atoms_it.count()
         if args.limit != 0 and count > args.limit:
             count = '{}+'.format(count-1)
@@ -792,25 +840,26 @@ def run(args, sys_args, verbosity):
         print('Found:', count)
 
     elif args.ids:
-        atoms_it = box.find(auth_token=token, filter=query,
-                            sort=sort, limit=args.limit,
-                            keys=keys, omit_keys=omit_keys)
+        atoms_it = my_abcd.find(filter=query,
+                                sort=sort, limit=args.limit,
+                                keys=keys, omit_keys=omit_keys)
         for atoms in atoms_it:
             uid = atoms.info.get('uid')
             print('  ' + uid)
 
     # Show the database
     elif args.show:
-        atoms_it = box.find(auth_token=token, filter=query,
-                            sort=sort, limit=args.limit,
-                            keys=keys, omit_keys=omit_keys)
+        atoms_it = my_abcd.find(filter=query,
+                                sort=sort, limit=args.limit,
+                                keys=keys, omit_keys=omit_keys)
         print_rows(atoms_it, border=args.pretty,
-            truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
+                   truncate=args.pretty, show_keys=keys,
+                   omit_keys=omit_keys)
 
     elif args.long:
-        atoms_it = box.find(auth_token=token, filter=query,
-                            sort=sort, limit=args.limit,
-                            keys=keys, omit_keys=omit_keys)
+        atoms_it = my_abcd.find(filter=query,
+                                sort=sort, limit=args.limit,
+                                keys=keys, omit_keys=omit_keys)
         try:
             atoms = next(atoms_it)
         except StopIteration:
@@ -826,7 +875,8 @@ def run(args, sys_args, verbosity):
         print_long_row(atoms)
 
     elif args.list or not args.database:
-        dbs = box.list(token)
+        # TODO: backends list each of their databases
+        dbs = my_abcd.box.list(my_abcd.token)
         if dbs:
             print('Hello. Databases you have access to:')
             for db in dbs:
@@ -836,8 +886,8 @@ def run(args, sys_args, verbosity):
 
     # Print info about keys
     else:
-        atoms_it = box.find(auth_token=token, filter=query,
-                            sort=sort, limit=args.limit, keys=keys,
-                            omit_keys=omit_keys)
+        atoms_it = my_abcd.find(filter=query,
+                                sort=sort, limit=args.limit, keys=keys,
+                                omit_keys=omit_keys)
         print_keys_table(atoms_it, border=args.pretty,
             truncate=args.pretty, show_keys=keys, omit_keys=omit_keys)
