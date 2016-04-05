@@ -6,7 +6,10 @@ from them.
 
 """
 
+import io
 import os
+import tarfile
+from base64 import b64decode
 from os import path
 
 import numpy as np
@@ -211,3 +214,62 @@ def atoms_to_files(atoms, filename, format=None):
             ase.io.write(config_filename, config, format=format)
             file_count += 1
         return file_count, file_count
+
+
+def extract_original_file(atoms, workdir='.', untar=False):
+    """
+    Given a single Atoms object, retrieve the original files that were
+    used to create it (stored in 'original_files').
+
+    Parameters
+    ----------
+    atoms : ase.Atoms
+        Configuration from which to extract the original files.
+
+    Returns
+    -------
+    number_of_files : int
+        The number of files created, either a tar file or the number of
+        extracted files.
+
+    """
+
+    if 'original_files' in atoms.info:
+        contents = atoms.info['original_files']
+    elif 'original_files' in atoms.arrays:
+        contents = atoms.arrays['original_files']
+    elif 'original_file_contents' in atoms.info:
+        contents = atoms.info['original_file_contents']
+    elif 'original_file_contents' in atoms.arrays:
+        contents = atoms.arrays['original_file_contents']
+    else:
+        # Nothing to extract
+        return False
+
+    if untar:
+        # Don't create a temporary file just extract in memory
+        contents_bytes = io.BytesIO(b64decode(contents))
+        tar = tarfile.open(fileobj=contents_bytes, mode='r')
+        file_count = len(tar.getmembers())
+        tar.extractall(path=workdir)
+        tar.close()
+        contents_bytes.close()
+        return file_count
+    else:
+        # TODO: atoms with no uid should not clobber each other
+        # use 0 when no uid is present
+        tar_name = "{0}-{1}.tar".format(atoms.get_chemical_formula()[:15],
+                                        atoms.info.get('uid', '0'))
+
+        # Write contents of tar file
+        tar_fullpath = path.join(workdir, tar_name)
+
+        if not path.exists(path.dirname(tar_fullpath)):
+            os.makedirs(path.dirname(tar_fullpath))
+        # Overwrites everything -- expected behaviour
+        # TODO: option for no overwrite?
+
+        with open(tar_fullpath, 'wb') as original_file:
+            original_file.write(b64decode(contents))
+
+        return 1

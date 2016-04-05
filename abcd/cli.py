@@ -582,7 +582,7 @@ def run(args, sys_args, verbosity):
                 # atoms_to_store.
                 for ats in atoms:
                     if tar:
-                        ats.info['original_files'] = str(tar)
+                        ats.info['original_files'] = tar.decode('ascii')
                     atoms_to_store.append(ats)
 
             for subdir_name, subdir in tree['subdirs'].items():
@@ -599,7 +599,7 @@ def run(args, sys_args, verbosity):
 
                 for ats in atoms:
                     if tar:
-                        ats.info['original_files'] = str(tar)
+                        ats.info['original_files'] = tar.decode('ascii')
                     atoms_to_store.append(ats)
 
         # At least one directory was specified on the command line.

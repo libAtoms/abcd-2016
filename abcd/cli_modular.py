@@ -7,27 +7,26 @@ from __future__ import print_function
 
 import argparse
 import getpass
-import os
 import io
+import os
 import shlex
 import sys
 import tarfile
 import time
+from base64 import b64encode
+from random import randint
 
-from abcd import Direction
-from ase.atoms import Atoms
 from ase.db.core import convert_str_to_float_or_str
 from ase.io import read as ase_read
-from ase.io import write as ase_write
+
+from abcd import Direction
+from abcd.util.atoms import atoms_to_files, extract_original_file
 from .authentication import Credentials
-from base64 import b64encode, b64decode
 from .config import ConfigFile
 from .query import translate
-from random import randint
 from .results import UpdateResult, InsertResult
 from .structurebox import StructureBox
 from .table import print_keys_table, print_rows, print_long_row
-from abcd.util.atoms import atoms_to_files
 
 description = ''
 
@@ -222,28 +221,6 @@ def to_stderr(*args):
         print(*(arg.rstrip('\n') for arg in args), file=sys.stderr)
 
 
-def untar_file(fileobj, path_prefix):
-    try:
-        tar = tarfile.open(fileobj=fileobj, mode='r')
-        members = tar.getmembers()
-        no_files = len(members)
-        tar.extractall(path=path_prefix)
-        return [os.path.join(path_prefix, m.name) for m in members]
-    except Exception as e:
-        to_stderr(str(e))
-        return None
-    finally:
-        tar.close()
-
-
-def untar_and_delete(tar_files, path_prefix):
-    # Untar individual tarballs
-    for tarball in tar_files:
-        with open(tarball, 'rb') as f:
-            untar_file(f, path_prefix)
-        os.remove(tarball)
-
-
 def print_result(result, multiconfig_files, database):
 
     if isinstance(result, UpdateResult):
@@ -332,6 +309,7 @@ def print_result(result, multiconfig_files, database):
         print('The following files were not included as original files:')
         for f in multiconfig_files:
             print('  ', f)
+
 
 class Abcd(object):
     """API interface to the functionality of the commandline.
@@ -433,8 +411,20 @@ class Abcd(object):
 
         return atoms_to_files(atoms, filename=filename, format=format)
 
-    def extract_original_files(self):
-        pass
+    def extract_original_files(self, filter, directory, limit=0, sort=None):
+        total_configs = 0
+        total_files = 0
+
+        for config in self.box.find(auth_token=self.token, filter=filter,
+                                    sort=sort, limit=limit,
+                                    keys=['original_files', 'uid']):
+
+            extracted_count = extract_original_file(config, directory)
+            if extracted_count:
+                total_configs +=1
+                total_files += extracted_count
+
+        return total_configs, total_files
 
     def store(self):
         pass
@@ -556,75 +546,10 @@ def run(args, sys_args, verbosity):
     # (current directory by default), or print the file
     # to stdout.
     elif args.extract_original_files:
-        # Extract original file contents from the atoms
-        names = []
-        unique_ids = []
-        original_files =[]
-        skipped_configs = []
-        nat = 0
-        for atoms in box.find(auth_token=token, filter=query,
-                        sort=sort, limit=args.limit,
-                        keys=['original_files', 'uid']):
-            nat += 1
-
-            # Find the original file contents
-            contents = ''
-            if 'original_files' in atoms.info:
-                contents = atoms.info['original_files']
-            elif 'original_files' in atoms.arrays:
-                contents = atoms.arrays['original_files']
-            elif 'original_file_contents' in atoms.info:
-                contents = atoms.info['original_file_contents']
-            elif 'original_file_contents' in atoms.arrays:
-                contents = atoms.arrays['original_file_contents']
-            else:
-                skipped_configs.append(nat)
-                continue
-
-            name = atoms.get_chemical_formula()
-            if len(name) > 15:
-                name = str[:15]
-            names.append(name)
-
-            # The Atoms object should have a uid, but if it doesn't
-            # then use uid='0'.
-            if 'uid' in atoms.info and atoms.info['uid'] is not None:
-                unique_ids.append(atoms.info['uid'])
-            else:
-                unique_ids.append('0')
-            original_files.append(contents)
-
-        # Mangle the names
-        for i, name in enumerate(names):
-            names[i] += '-' + str(unique_ids[i])[-15:]
-
-        extracted_paths = []
-
-        # Write the file locally
-        for i in range(len(names)):
-            path = os.path.join(args.path_prefix, names[i]+'.tar')
-
-            if not os.path.exists(os.path.dirname(path)):
-                os.makedirs(os.path.dirname(path))
-            elif os.path.exists(path):
-                out('{} already exists. Skipping write'.format(path))
-
-            with open(path, 'wb') as original_file:
-                original_file.write(b64decode(original_files[i]))
-                extracted_paths.append(path)
-
-        msg = '  Extracted original files from {} configurations\n'.format(len(extracted_paths))
-        if skipped_configs:
-            msg += '  No original files stored for configurations {}\n'.format(skipped_configs)
-
-        # Untar individual tarballs
-        if extracted_paths:
-            if args.untar:
-                untar_and_delete(extracted_paths, args.path_prefix)
-                msg += '  Files were untarred to {}/'.format(args.path_prefix)
-            else:
-                msg += '  Files were written to {}/'.format(args.path_prefix)
-        out(msg)
+        config_count, file_count = my_abcd.extract_original_files(
+            query, directory=args.path_prefix, limit=args.limit, sort=sort)
+        print("Extracted {0} files from {0} configurations."
+              "".format(file_count, config_count))
 
     elif (args.store or args.update):
         if args.store:
@@ -695,7 +620,7 @@ def run(args, sys_args, verbosity):
                 # atoms_to_store.
                 for ats in atoms:
                     if tar:
-                        ats.info['original_files'] = str(tar)
+                        ats.info['original_files'] = tar.decode('ascii')
                     atoms_to_store.append(ats)
 
             for subdir_name, subdir in tree['subdirs'].items():
@@ -712,7 +637,7 @@ def run(args, sys_args, verbosity):
 
                 for ats in atoms:
                     if tar:
-                        ats.info['original_files'] = str(tar)
+                        ats.info['original_files'] = tar.decode('ascii')
                     atoms_to_store.append(ats)
 
         # At least one directory was specified on the command line.
