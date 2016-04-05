@@ -1,3 +1,7 @@
+"""
+abcd commandline client
+
+"""
 
 from __future__ import print_function
 
@@ -9,6 +13,7 @@ import shlex
 import sys
 import tarfile
 import time
+
 from abcd import Direction
 from ase.atoms import Atoms
 from ase.db.core import convert_str_to_float_or_str
@@ -22,6 +27,7 @@ from random import randint
 from .results import UpdateResult, InsertResult
 from .structurebox import StructureBox
 from .table import print_keys_table, print_rows, print_long_row
+from abcd.util.atoms import atoms_to_files
 
 description = ''
 
@@ -331,7 +337,7 @@ class Abcd(object):
     """API interface to the functionality of the commandline.
 
     Instance with a database identifier and it will take care of
-    initialisation and provide an easy interface to user friendly methods.
+    initialisation and provide methods to work with the selected database.
     For a more low level interface, look at StructureBox.
     """
     def __init__(self, database, **kwargs):
@@ -415,8 +421,17 @@ class Abcd(object):
                              limit=limit, keys=keys, omit_keys=omit_keys)
 
 
-    def write_to_file(self):
-        pass
+    def write_to_file(self, filter, filename='out.xyz', format=None, sort=None,
+                      limit=0, keys=None, omit_keys=False):
+        """
+        Find the configurations given the query options, write the extracted
+        configurations to a file.
+        """
+        atoms = list(self.box.find(auth_token=self.token, filter=filter,
+                                   sort=sort, limit=limit, keys=keys,
+                                   omit_keys=omit_keys))
+
+        return atoms_to_files(atoms, filename=filename, format=format)
 
     def extract_original_files(self):
         pass
@@ -500,30 +515,21 @@ def run(args, sys_args, verbosity):
             remove_keys.append(key)
     remove_keys = [a for a in remove_keys if a not in (None, '', ' ')]
 
+    # 'Connect' to the database
     my_abcd = Abcd(database=args.database, remote=args.remote,
                    user=args.user, password=args.password)
 
+    #
+    # Do things with the database...
+    #
 
+    # Delete
     if args.remove:
         print(my_abcd.remove(query).msg)
 
     # Extract a configuration from the database and write it
     # to the specified file.
     elif args.write_to_file:
-        filename, display_format = os.path.splitext(args.write_to_file)
-        if not display_format:
-            display_format = 'xyz'
-        elif display_format[0] == '.':
-            display_format = display_format[1:]
-
-        # displayed_format will appear in the file name
-        if display_format == 'xyz':
-            format = 'extxyz'
-        else:
-            format = display_format
-
-        nrows = 0
-        list_of_atoms = []
 
         # Make sure 'original_files' is omitted
         omit = omit_keys
@@ -538,55 +544,12 @@ def run(args, sys_args, verbosity):
             keys = ['original_files']
             omit = True
 
-        for atoms in box.find(auth_token=token, filter=query,
-                              sort=sort, limit=args.limit,
-                              keys=keys, omit_keys=omit):
-            list_of_atoms.append(atoms)
-            nrows += 1
+        # filename in the write to file argument
+        nfiles, nconfigs = my_abcd.write_to_file(
+            query, args.write_to_file, format=None, sort=sort,
+            limit=args.limit, keys=keys,  omit_keys=omit)
 
-        if not list_of_atoms:
-            to_stderr('No atoms selected')
-            return
-
-        if '%' not in filename:
-            one_file = True
-        else:
-            one_file = False
-
-        def add_atoms_to_tar(tar, atoms, name, format):
-            # For some reason tarring doesn't work
-            # if temp_s is used directly in the
-            # tar.addfile function. For this reason
-            # the contents of temp_s are transferred
-            # to s.
-            temp_s = io.StringIO()
-            ase_write(temp_s, atoms, format=format)
-            s = io.StringIO(temp_s.getvalue())
-            temp_s.close()
-
-            info = tarfile.TarInfo(name=name)
-            info.size = len(s.buf)
-            tar.addfile(tarinfo=info, fileobj=s)
-            s.close()
-
-        def write_atoms_locally(atoms, name, format, path_prefix):
-            if not os.path.exists(path_prefix):
-                os.makedirs(path_prefix)
-            ase_write(os.path.join(path_prefix, name), atoms, format=format)
-
-        files_written = 0
-        if one_file:
-            name = filename + '.' + display_format
-            write_atoms_locally(list_of_atoms, name, format, args.path_prefix)
-            files_written = 1
-        else:
-            # Write extracted configurations into separate files
-            for i, atoms in enumerate(list_of_atoms):
-                name = filename % i + '.' + display_format
-                write_atoms_locally(atoms, name, format, args.path_prefix)
-                files_written += 1
-
-        out('  Writing {} file(s) to {}/'.format(files_written, args.path_prefix))
+        out('  Wrote {} configs in {} file(s)'.format(nconfigs, nfiles))
 
     # Extract original file(s) from the database and write them
     # to the directory specified by the --path-prefix argument

@@ -1,16 +1,16 @@
-# ABCD
+# `abcd`
 
-*Build info* [![Build Status](https://travis-ci.org/libAtoms/abcd.svg?branch=master)](https://travis-ci.org/libAtoms/abcd)
+*Build info:* [![Build Status](https://travis-ci.org/libAtoms/abcd.svg?branch=master)](https://travis-ci.org/libAtoms/abcd)
 
-*Docs* [![Documentation Status](https://readthedocs.org/projects/abcd/badge/?version=latest)](http://abcd.readthedocs.org/en/latest/?badge=latest)
+*Docs:* [![Documentation Status](https://readthedocs.org/projects/abcd/badge/?version=latest)](http://abcd.readthedocs.org/en/latest/?badge=latest)
 
 
-**ABCD** is the **A**tom-**B**ased **C**onfiguration **D**atabase. Designed to
-store atomistic data with an interface that makes it easy to work with 
+**`abcd`** is the **A**tom-**B**ased **C**onfiguration **D**atabase. Designed to
+store atomistic data with an interface that makes it easy to work with
 and share your data.
- 
+
 ```shell
-% abcd tungsten --store *.xyz
+% abcd tungsten.db --store *.xyz
 35 configurations were inserted:
   42049fa6f48a2e1
   ebce002d9192f15
@@ -36,8 +36,21 @@ and share your data.
   Writing 12 file(s) to ./
 ```
 
-ABCD works with several database backends (ase, mongodb) and can be extended 
-to any others using a simple specification.
+`abcd` works with several database backends out of the box (ase, mongodb) and
+can be extended to any others using a simple specification.
+
+Key features that `abcd` provides includes:
+
+- Universal interface to many database backends
+- Access databses on remote machines or share your local databases remotely
+- Works with anything that an `ase` `Atoms` object can do
+- Able to store original data (input/output) files for reference with every
+  configuration.
+- Allows user to work with commandline tools or directly interface with Python
+
+For full documentation, see: http://abcd.readthedocs.org/en/latest/
+
+## Quickstart guide
 
 To use ABCD, two main steps have to be performed:
 
@@ -59,15 +72,15 @@ This will vary depending on the backend. For example, these are the steps requir
 
 - Run the setup script (it will install two commands: *abcd-asedb* and *abcd-asedb-server*):
 
-> cd backends/asedb_sqlite3  
+> cd backends/asedb_sqlite3
 > python setup.py install --user
 
 - Open *~/.abcd_config* and complete it in the following way:
 
-> [abcd]  
-> opts = ''  
-> backend\_module = asedb_sqlite3\_backend.asedb\_sqlite3_backend  
-> backend\_name = ASEdbSQlite3Backend  
+> [abcd]
+> opts = ''
+> backend\_module = asedb_sqlite3\_backend.asedb\_sqlite3_backend
+> backend\_name = ASEdbSQlite3Backend
 
 - Run the additional setup by executing ```abcd-asedb --setup```.
 
@@ -75,7 +88,7 @@ All your databases are stored in the *$databases/all/* directory. If you run the
 
 - Execute ```abcd-asedb --add-user USER``` (replace USER with the name of a person you want to give access to). This will prompt you for a public SSH key of USER, and then add an entry in the *~/.ssh/authorized_keys* file and create folders *$databases/USER* and *$databases/USER_readonly*.
 
-If the user queries your machine remotely, they will have access only to what is in their user folders (*$databases/USER* and *$databases/USER_readonly*). Anything under $databases/USER_readonly* is considered to be read-only, while anything under $databases/USER* is readable and writable by the USER. 
+If the user queries your machine remotely, they will have access only to what is in their user folders (*$databases/USER* and *$databases/USER_readonly*). Anything under $databases/USER_readonly* is considered to be read-only, while anything under $databases/USER* is readable and writable by the USER.
 
 If you want to give the USER access to your database, create a symlink to this database (which is under *$databases/all*) and put this symlink either in $databases/USER* or $databases/USER_readonly*. For example:
 
@@ -98,28 +111,28 @@ If you want to give the USER access to your database, create a symlink to this d
 - ```abcd abcd@gc121mac1:db1.db --extract-original-files --path-prefix extracted_files --untar``` - extract original files to the specified folder
 - ```abcd abcd@gc121mac1:db1.db --write-to-file extr%03d.xyz``` - write configurations from the database to files extr001.xyz, extr002.xyz, ...
 
-**Note for the OSX users:** If you see the following warning when connecting to a remote:  
+**Note for the OSX users:** If you see the following warning when connecting to a remote:
 > Warning: No xauth data; using fake authentication data for X11 forwarding.
 > X11 forwarding request failed on channel 0
 
-You can remove it by adding the following line to the ~/.ssh/config file on your local machine:  
+You can remove it by adding the following line to the ~/.ssh/config file on your local machine:
 > ForwardX11 no
 
 ### Queries
 
-Queries are in a form <key><operator><val1,val2,...> <key><operator><val1,val2...>. <k><op><val> expressions separated by spaces are assumed to be ANDed, while values separated by commas are assumed to be ORed. Example:  
+Queries are in a form <key><operator><val1,val2,...> <key><operator><val1,val2...>. <k><op><val> expressions separated by spaces are assumed to be ANDed, while values separated by commas are assumed to be ORed. Example:
 
-- ```'energy<0.1 user=alice,bob test=1'``` - means "*energy* less than 0.1 AND *user* is alice or bob AND *test* is equal to 1"  
+- ```'energy<0.1 user=alice,bob test=1'``` - means "*energy* less than 0.1 AND *user* is alice or bob AND *test* is equal to 1"
 
-Key can be any key in the Atoms.info dictionary. Operator can be one of the ```=, !=, <, <=, >, >=, ~```, where "~" means "contains" and can be used with the special key "elements":  
+Key can be any key in the Atoms.info dictionary. Operator can be one of the ```=, !=, <, <=, >, >=, ~```, where "~" means "contains" and can be used with the special key "elements":
 
 - ```elements~C elements~H,F,Cl``` - means "contains C AND at least one of H, F and Cl"
 
-Operator ```!=``` is an exception, because comma-separated values that follow it are assumed to be ANDed, not ORed:  
+Operator ```!=``` is an exception, because comma-separated values that follow it are assumed to be ANDed, not ORed:
 
 - ```user!=alice,bob``` - means "*user* is not alice AND not bob"
 
-**Notes** 
+**Notes**
 
 - If a query contains "<" or ">" it needs to be enclosed in quotes.
 - (Only for the ASEdb SQLite3 backend) If a row doesn't contain a key K, then a query ```K!=VAL``` will not show this row. This might be fixed in future versions.
@@ -188,4 +201,4 @@ However, if a formatting string is used, *abcd* writes each configuration into a
 
 ## Backends
 
-All backends need to conform to the Backend class defined in abcd/backend.py. 
+All backends need to conform to the Backend class defined in abcd/backend.py.

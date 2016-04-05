@@ -12,7 +12,9 @@ Contents:
    :maxdepth: 2
 
    introduction
+   installation
    design
+   contributors
    todo
 
 API Documentation

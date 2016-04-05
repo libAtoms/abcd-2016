@@ -24,14 +24,14 @@ Response codes:
 from __future__ import print_function
 
 import argparse
-from . import asedb_sqlite3_backend as backend
 import json
 import sys
+from base64 import b64encode, b64decode
+
 from abcd.backend import ReadError, WriteError
 from abcd.structurebox import StructureBox
-from abcd.util import dict2atoms, atoms2dict
+from abcd.util.atoms import dict2atoms, atoms2dict
 from .asedb_sqlite3_backend import ASEdbSQlite3Backend as Backend
-from base64 import b64encode, b64decode
 
 __author__ = 'Patrick Szmucer'
 

@@ -1,19 +1,17 @@
-from abcd import util, results
-
 __author__ = 'Martin Uhrin'
 
-import numpy as np
-from pymongo import MongoClient
-from pymongo.son_manipulator import SONManipulator
-from bson.objectid import ObjectId
 import ase.atoms
 import ase.db.row
+import numpy as np
+from bson.objectid import ObjectId
+from pymongo import MongoClient
+from pymongo.son_manipulator import SONManipulator
 
-from abcd.backend import Backend
 import abcd.authentication as authentication
 import abcd.backend
 import abcd.results as results
-import abcd.util as util
+import abcd.util.atoms as util
+from abcd.backend import Backend
 
 
 class MongoDBBackend(Backend):

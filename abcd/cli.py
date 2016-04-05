@@ -1,24 +1,24 @@
-
 from __future__ import print_function
 
 import argparse
 import getpass
-import os
 import io
+import os
 import shlex
 import sys
 import tarfile
 import time
-from abcd import Direction
-from ase.atoms import Atoms
+from base64 import b64encode, b64decode
+from random import randint
+
 from ase.db.core import convert_str_to_float_or_str
 from ase.io import read as ase_read
 from ase.io import write as ase_write
+
+from abcd import Direction
 from .authentication import Credentials
-from base64 import b64encode, b64decode
 from .config import ConfigFile
 from .query import translate
-from random import randint
 from .results import UpdateResult, InsertResult
 from .structurebox import StructureBox
 from .table import print_keys_table, print_rows, print_long_row

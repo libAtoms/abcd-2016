@@ -1,10 +1,11 @@
 from __future__ import print_function
 
 import collections
-import numpy as np
 import time
+
 from prettytable import PrettyTable
-from .util import atoms2dict, filter_keys
+
+from abcd.util.atoms import atoms2dict, filter_keys
 
 __author__ = 'Patrick Szmucer'
 

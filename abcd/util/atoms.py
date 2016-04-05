@@ -1,10 +1,24 @@
-__author__ = 'Martin Uhrin, Patrick Szmucer'
+"""
+abcd.util.atoms
+
+Functions to process atoms objects between formats or extract information
+from them.
+
+"""
+
+import os
+from os import path
 
 import numpy as np
+import ase.io
 from ase.atoms import Atoms
 from ase.calculators.calculator import get_calculator, all_properties
 from ase.calculators.singlepoint import SinglePointCalculator
 from six import string_types
+
+from abcd.util.text import filename_enumerator
+
+__author__ = 'Martin Uhrin, Patrick Szmucer'
 
 
 def filter_keys(keys_list, keys, omit_keys):
@@ -139,3 +153,61 @@ def dict2atoms(d, plain_arrays=False):
         for key, value in d['info'].items():
             atoms.info[str(key)] = value
     return atoms
+
+
+def atoms_to_files(atoms, filename, format=None):
+    """
+    Write the atoms to a file or files.
+
+    Parameters
+    ----------
+    atoms : ase.Atoms or list of ase.Atoms
+        Configurations to write to files.
+    filename : str
+        A single file name, or a string that can be formatted using {}
+        formats or % interpolation.
+    format : str, optional
+        Output format to pass to ase, if not given, ase will try to guess
+        from the filename.
+
+    Returns
+    -------
+    num_configs, num_files : int, int
+        The number of configurations, and the number of files written
+
+    """
+
+    # Always work with multiconfigurations, even for single configurations
+    if isinstance(atoms, Atoms):
+        atoms = [atoms]
+
+    # ensure extxyz for xyz files, but let
+    # ase write take care of other formats itself.
+    if filename.endswith('.xyz') and not format:
+        format = 'extxyz'
+
+    # TODO: iterator for large numbers of configurations?
+    # TODO: format strings with atoms properties?
+    # TODO: output to specific path
+
+    # incorporate index in filename
+    enumerator = filename_enumerator(filename)
+    if enumerator is None:
+        # Dump all as a single file, one filename.
+        config_path = path.dirname(filename)
+        if config_path and not path.isdir(config_path):
+            os.makedirs(config_path)
+        ase.io.write(filename, atoms, format=format)
+        return 1, len(atoms)
+    else:
+        # We can have multiple files! In multiple directories
+        # count files rather than use idx so that we correctly get the 0 case
+        file_count = 0
+        for idx, config in enumerate(atoms):
+            config_filename = enumerator(idx)
+            config_path = path.dirname(config_filename)
+            if config_path and not path.isdir(config_path):
+                os.makedirs(config_path)
+            ase.io.write(config_filename, config, format=format)
+            file_count += 1
+        return file_count, file_count
